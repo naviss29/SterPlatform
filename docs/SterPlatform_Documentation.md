@@ -1,9 +1,9 @@
 # SterPlatform — Documentation technique
 
-> Version : 0.2
+> Version : 0.3
 > Auteur : Alan
 > Date : Mai 2026
-> Statut : **Phase 1 terminée — Auth complète opérationnelle**
+> Statut : **Phase 1 terminée — Auth complète opérationnelle — PostgreSQL 18**
 
 ---
 
@@ -13,6 +13,7 @@
 |---|---|---|
 | 0.1 | Mai 2026 | Phase 0 — Scaffold Symfony 8, Docker (PHP 8.4 + PostgreSQL 16 + Nginx + Mercure + Mailpit), API Platform 4, LexikJWT, JWT keypair générée, socle opérationnel |
 | 0.2 | Mai 2026 | Phase 1 — Auth générique complète : entité User (UUID), migration, firewall JWT, endpoints register/verify/login/forgot-password/reset-password/me, MailerService + templates Twig, 17 tests PHPUnit passants |
+| 0.3 | Mai 2026 | Upgrade PostgreSQL 16 → 18 (tous les environnements), correction du point de montage volume PG18 (`/var/lib/postgresql` au lieu de `/var/lib/postgresql/data`), Dockerfile production multi-stage (PHP-FPM + Nginx + Supervisor), CI GitHub Actions, deploy webhook Coolify |
 
 ---
 
@@ -28,7 +29,7 @@ Un seul backend sert tous les projets (DartsOpen, FestManager, futurs projets) s
 
 | Supabase | SterPlatform |
 |---|---|
-| PostgreSQL | PostgreSQL 16 + Doctrine ORM |
+| PostgreSQL | PostgreSQL 18 + Doctrine ORM |
 | Auth JWT + email | LexikJWT + Symfony Security + Mailer |
 | API REST auto-générée | API Platform 4 (OpenAPI / JSON-LD) |
 | Row Level Security (RLS) | Symfony Voters + Doctrine Filters |
@@ -50,7 +51,7 @@ Un seul backend sert tous les projets (DartsOpen, FestManager, futurs projets) s
 | Email | Symfony Mailer + Twig | Templates HTML, SMTP / Mailpit en dev |
 | Admin | EasyAdmin 4 | Dashboard rapide à générer depuis les entités *(Phase 4)* |
 | Tests | PHPUnit + ApiTestCase | Tests unitaires + intégration API |
-| Base de données | PostgreSQL 16 | Même DB que Supabase — migration facilitée |
+| Base de données | PostgreSQL 18 | Version LTS la plus récente — même famille que Supabase |
 | Containerisation | Docker + Docker Compose | Déploiement identique aux autres projets |
 | Déploiement | Coolify v4 sur Hetzner CX23 | Infrastructure partagée |
 
@@ -167,7 +168,7 @@ SterPlatform/
 |---|---|---|---|
 | php | Dockerfile (PHP 8.4-fpm) | — | PHP-FPM — traite les requêtes Symfony |
 | nginx | nginx:1.27-alpine | 8080 → 80 | Reverse proxy vers php:9000 |
-| db | postgres:16-alpine | 5432 | Base de données PostgreSQL |
+| db | postgres:18-alpine | 5432 | Base de données PostgreSQL |
 | mercure | dunglas/mercure | 9090 → 80 | Hub SSE temps réel |
 | mailer | axllent/mailpit | 8025 (UI), 1025 (SMTP) | Intercepteur email dev *(compose.override.yaml)* |
 
@@ -220,6 +221,8 @@ docker compose down -v
 | 9 | PHPUnit — "test.service_container not found" | `getContainer()` dans `setUp()` échoue avec "Could not find service test.service_container" alors que `framework.test: true` est configuré | Appeler `createClient()` **avant** `getContainer()` dans `setUp()`. `createClient()` est ce qui booste le kernel en mode test — `getContainer()` utilisé en premier ne peut pas trouver le service container de test. |
 | 10 | PHPUnit — "Booting the kernel before createClient() is not supported" | Appeler `static::createClient()` depuis une méthode helper (ex. `getJwtToken()`) échoue si le kernel est déjà booté depuis `setUp()` | Stocker le client dans `$this->client` lors du `setUp()` et réutiliser la même instance dans tous les helpers et tests. Ne jamais appeler `createClient()` plusieurs fois dans le même test. |
 | 11 | `access_control` — `/api/auth/me` public par héritage de règle | La règle `{ path: ^/api/auth, roles: PUBLIC_ACCESS }` couvre `/api/auth/me`. Un appel sans token atteint le contrôleur avec `getUser() === null` → crash 500 au lieu de 401. | Ajouter une règle plus spécifique **avant** la règle générale : `{ path: ^/api/auth/me$, roles: IS_AUTHENTICATED_FULLY }`. Dans `access_control`, la première règle qui matche gagne. |
+| 12 | Docker — PostgreSQL 18 — container crash au démarrage | Après upgrade PG16 → PG18, le container `db` crashe avec : `"there appears to be PostgreSQL data in /var/lib/postgresql/data (unused mount/volume)"`. PG18 change la structure interne : les données sont désormais stockées dans un sous-répertoire versionné (ex. `/var/lib/postgresql/18/main`) au lieu de `/var/lib/postgresql/data` directement. | Changer le point de montage du volume dans `docker-compose.yml` (et `.prod.yml`) : **`- db_data:/var/lib/postgresql`** (sans `/data`). Puis `docker compose down -v` + `docker compose up -d` pour recréer le volume avec la bonne structure. |
+| 13 | CI GitHub Actions — `serverVersion` incohérent avec image PG | Le `DATABASE_URL` en CI pointait vers `serverVersion=16` alors que l'image PostgreSQL était déjà `postgres:18-alpine` → Doctrine générait des requêtes avec hints PG16, potentiellement incompatibles avec PG18. | Mettre à jour simultanément l'image (`postgres:18-alpine`) et le `serverVersion` dans `DATABASE_URL` (`serverVersion=18`) dans `ci.yml`. Les deux doivent toujours être synchronisés. |
 
 ---
 
@@ -242,12 +245,15 @@ docker compose down -v
 | 11 | Mai 2026 | AuthController — 5 endpoints | `POST /api/auth/register` (email+password → user créé + email envoyé), `GET /api/auth/verify?token=` (activation compte), `POST /api/auth/login` (géré par firewall json_login → JWT), `POST /api/auth/forgot-password` (envoi email reset), `POST /api/auth/reset-password` (nouveau mdp via token), `GET /api/auth/me` (profil JWT). Réponses génériques sur register/forgot-password pour éviter l'énumération d'emails. |
 | 12 | Mai 2026 | MailerService + templates Twig | `MailerService` injecte `MailerInterface`, `Environment` (Twig), `$appUrl`, `$fromEmail`. Templates HTML responsive `emails/verification.html.twig` et `emails/reset_password.html.twig`. Variables d'env `APP_URL` et `APP_FROM_EMAIL` ajoutées. MAILER_DSN=`smtp://mailer:1025` (Mailpit) en dev, `null://null` en test. |
 | 13 | Mai 2026 | PHPUnit — 17 tests passants | `tests/Controller/AuthControllerTest.php` : 17 tests couvrant register (succès, email invalide, mdp court, email existant→201), login (succès→JWT, mauvais mdp→401, email inconnu→401), verify (succès, token invalide, token expiré), forgot-password (succès, email inconnu→200), reset-password (succès, token expiré, mdp court), me (JWT valide→200, pas de token→401). Base de test `sterplatform_test` créée et migrée. |
+| 14 | Mai 2026 | Dockerfile production multi-stage | `Dockerfile` à la racine : stage 1 = `composer:2` installe les dépendances sans `--dev` ; stage 2 = `php:8.4-fpm` + nginx + supervisor. Un seul container expose le port 80. Compatible Coolify, Jenkins, tout CI/CD standard. `docker/supervisor/supervisord.conf` orchestre php-fpm et nginx. `docker/php/entrypoint.prod.sh` : cache:clear + migrations + exec supervisord. |
+| 15 | Mai 2026 | CI GitHub Actions | `.github/workflows/ci.yml` : déclenché sur push/PR vers `develop` et `main`. Service PostgreSQL 18, PHP 8.4, cache Composer, génération JWT keypair, migration, phpunit. `.github/workflows/deploy.yml` : déclenché sur push `main`, appelle le webhook Coolify via secrets `COOLIFY_TOKEN` et `COOLIFY_WEBHOOK_URL`. |
+| 16 | Mai 2026 | Upgrade PostgreSQL 16 → 18 | Mise à jour de `docker-compose.yml`, `docker-compose.prod.yml`, `.env`, `.env.example`, `ci.yml` : image `postgres:18-alpine`, `serverVersion=18` dans `DATABASE_URL`. Correction du point de montage volume (`/var/lib/postgresql` sans `/data` — breaking change PG18). Reset des volumes locaux (`docker compose down -v` + relance). |
 
 ---
 
 ## 9. Roadmap
 
-- [x] Phase 0 — Socle technique (Symfony 8, Docker, API Platform 4, PostgreSQL 16, JWT)
+- [x] Phase 0 — Socle technique (Symfony 8, Docker, API Platform 4, PostgreSQL 18, JWT, CI/CD GitHub Actions, Coolify)
 - [x] Phase 1 — Auth générique (User entity, register, verify, login, forgot-password, reset-password, me — 17 tests)
 - [ ] Phase 2 — Multi-tenancy (Organization, TenantFilter, Voters)
 - [ ] Phase 3 — Mercure Real-time (MercurePublisher, EventSubscriber, exemples Next.js + Angular)

@@ -2,7 +2,7 @@
 
 Backend Symfony générique multi-projets — remplace Supabase pour DartsOpen, FestManager et les projets futurs.
 
-**Stack :** Symfony 8 · PHP 8.4 · API Platform 4 · PostgreSQL 16 · LexikJWT · Mercure · Docker
+**Stack :** Symfony 8 · PHP 8.4 · API Platform 4 · PostgreSQL 18 · LexikJWT · Mercure · Docker
 
 ---
 
@@ -106,8 +106,8 @@ docker compose down -v
 
 | Phase | Statut |
 |---|---|
-| Phase 0 — Socle (Symfony 8, Docker, API Platform, JWT) | ✅ Terminée |
-| Phase 1 — Auth générique (User, register, login, reset) | En attente |
+| Phase 0 — Socle (Symfony 8, Docker, API Platform, JWT, CI/CD, Coolify) | ✅ Terminée |
+| Phase 1 — Auth générique (User, register, login, reset — 17 tests) | ✅ Terminée |
 | Phase 2 — Multi-tenancy (Organization, TenantFilter, Voters) | En attente |
 | Phase 3 — Mercure Real-time | En attente |
 | Phase 4 — Admin & Observabilité (EasyAdmin 4) | En attente |
