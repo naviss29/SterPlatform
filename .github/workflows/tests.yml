@@ -15,7 +15,6 @@ jobs:
       APP_ENV: test
       DATABASE_URL: postgresql://sterplatform:sterplatform@127.0.0.1:5432/sterplatform?serverVersion=18&charset=utf8
       JWT_PASSPHRASE: test_passphrase
-      MERCURE_JWT_SECRET: sterplatform_mercure_secret_key_32ch
       MERCURE_HUB_INTERNAL_URL: http://localhost:9090/.well-known/mercure
       MERCURE_HUB_PUBLIC_URL: http://localhost:9090/.well-known/mercure
 

@@ -7,3 +7,10 @@ mercure:
                 secret: '%env(MERCURE_JWT_SECRET)%'
                 publish: '*'
                 subscribe: []
+
+when@test:
+    mercure:
+        hubs:
+            default:
+                jwt:
+                    secret: 'sterplatform_mercure_test_secret_key_ok'
