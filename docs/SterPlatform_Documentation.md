@@ -1,9 +1,9 @@
 # SterPlatform — Documentation technique
 
-> Version : 0.3
+> Version : 0.4
 > Auteur : Alan
 > Date : Mai 2026
-> Statut : **Phase 1 terminée — Auth complète opérationnelle — PostgreSQL 18**
+> Statut : **Phase 1b terminée — JWT refresh + logout + CI GitHub Actions**
 
 ---
 
@@ -14,6 +14,7 @@
 | 0.1 | Mai 2026 | Phase 0 — Scaffold Symfony 8, Docker (PHP 8.4 + PostgreSQL 16 + Nginx + Mercure + Mailpit), API Platform 4, LexikJWT, JWT keypair générée, socle opérationnel |
 | 0.2 | Mai 2026 | Phase 1 — Auth générique complète : entité User (UUID), migration, firewall JWT, endpoints register/verify/login/forgot-password/reset-password/me, MailerService + templates Twig, 17 tests PHPUnit passants |
 | 0.3 | Mai 2026 | Upgrade PostgreSQL 16 → 18 (tous les environnements), correction du point de montage volume PG18 (`/var/lib/postgresql` au lieu de `/var/lib/postgresql/data`), Dockerfile production multi-stage (PHP-FPM + Nginx + Supervisor), CI GitHub Actions, deploy webhook Coolify |
+| 0.4 | Mai 2026 | Phase 1b — JWT refresh token (`POST /api/auth/refresh`), logout avec révocation (`POST /api/auth/logout`), entité `RefreshToken` + migration, CI GitHub Actions opérationnel (tests + lint sur `develop` + `main`), 23 tests PHPUnit passants |
 
 ---
 
@@ -46,7 +47,7 @@ Un seul backend sert tous les projets (DartsOpen, FestManager, futurs projets) s
 | Framework | Symfony 8.0 (PHP 8.4) | Mature, performant, écosystème riche — proche de Spring Boot |
 | API | API Platform 4 | Génère REST + OpenAPI depuis les entités Doctrine |
 | ORM | Doctrine ORM 3 | Migrations, repositories, relations — équivalent Hibernate |
-| Auth | LexikJWTAuthenticationBundle 3 | JWT access + refresh tokens, standard industrie |
+| Auth | LexikJWTAuthenticationBundle 3 + gesdinet/jwt-refresh-token-bundle 2 | JWT access token + refresh token persisté en base, standard industrie |
 | Temps réel | Mercure (hub dunglas) | SSE pub/sub, inventé par l'équipe Symfony |
 | Email | Symfony Mailer + Twig | Templates HTML, SMTP / Mailpit en dev |
 | Admin | EasyAdmin 4 | Dashboard rapide à générer depuis les entités *(Phase 4)* |
@@ -248,6 +249,8 @@ docker compose down -v
 | 14 | Mai 2026 | Dockerfile production multi-stage | `Dockerfile` à la racine : stage 1 = `composer:2` installe les dépendances sans `--dev` ; stage 2 = `php:8.4-fpm` + nginx + supervisor. Un seul container expose le port 80. Compatible Coolify, Jenkins, tout CI/CD standard. `docker/supervisor/supervisord.conf` orchestre php-fpm et nginx. `docker/php/entrypoint.prod.sh` : cache:clear + migrations + exec supervisord. |
 | 15 | Mai 2026 | CI GitHub Actions | `.github/workflows/ci.yml` : déclenché sur push/PR vers `develop` et `main`. Service PostgreSQL 18, PHP 8.4, cache Composer, génération JWT keypair, migration, phpunit. `.github/workflows/deploy.yml` : déclenché sur push `main`, appelle le webhook Coolify via secrets `COOLIFY_TOKEN` et `COOLIFY_WEBHOOK_URL`. |
 | 16 | Mai 2026 | Upgrade PostgreSQL 16 → 18 | Mise à jour de `docker-compose.yml`, `docker-compose.prod.yml`, `.env`, `.env.example`, `ci.yml` : image `postgres:18-alpine`, `serverVersion=18` dans `DATABASE_URL`. Correction du point de montage volume (`/var/lib/postgresql` sans `/data` — breaking change PG18). Reset des volumes locaux (`docker compose down -v` + relance). |
+| 17 | Mai 2026 | Phase 1b — JWT Refresh Token + Logout | Installation `gesdinet/jwt-refresh-token-bundle` v2.0.0. Entité `RefreshToken` étend le `mapped-superclass` du bundle, table `refresh_tokens`. `POST /api/auth/refresh` géré par le firewall `refresh_jwt` (stub route nécessaire). `POST /api/auth/logout` révoque le refresh token via `RefreshTokenManagerInterface` (JWT requis). Login retourne désormais `token` + `refresh_token`. 6 tests ajoutés (23/23 passants). Bundle enregistré manuellement dans `bundles.php` (recipe Flex ignorée). |
+| 18 | Mai 2026 | CI GitHub Actions — workflow tests.yml | `.github/workflows/tests.yml` : déclenché sur push/PR vers `develop` et `main`. Service `postgres:18-alpine`, PHP 8.4 + extensions, cache Composer, génération JWT keypair, migration test, phpunit. `DATABASE_URL` injecté via env dans le workflow (pas de secrets requis pour les tests). |
 
 ---
 
@@ -255,6 +258,7 @@ docker compose down -v
 
 - [x] Phase 0 — Socle technique (Symfony 8, Docker, API Platform 4, PostgreSQL 18, JWT, CI/CD GitHub Actions, Coolify)
 - [x] Phase 1 — Auth générique (User entity, register, verify, login, forgot-password, reset-password, me — 17 tests)
+- [x] Phase 1b — JWT refresh token + logout + CI GitHub Actions (23 tests)
 - [ ] Phase 2 — Multi-tenancy (Organization, TenantFilter, Voters)
 - [ ] Phase 3 — Mercure Real-time (MercurePublisher, EventSubscriber, exemples Next.js + Angular)
 - [ ] Phase 4 — Admin & Observabilité (EasyAdmin 4, /health, logs structurés)

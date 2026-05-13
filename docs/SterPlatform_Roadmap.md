@@ -1,9 +1,9 @@
 # SterPlatform — Roadmap & Plan technique
 
-> Version : 0.4 — Phase 1 terminée, Coolify prod opérationnel
+> Version : 0.5 — Phase 1b terminée, CI GitHub Actions opérationnel
 > Auteur : Alan
 > Date : Mai 2026
-> Statut : **Phase 1 terminée — Phase 1b à démarrer**
+> Statut : **Phase 1b terminée — Phase 2 à démarrer**
 
 ---
 
@@ -167,18 +167,18 @@ Chaque projet (DartsOpen, FestManager…) étend ce socle avec ses propres entit
 
 ---
 
-### Phase 1b — JWT Refresh Token *(1 session)*
+### Phase 1b — JWT Refresh Token ✅ *(terminée)*
 
 **Objectif :** Compléter l'auth avec le renouvellement automatique du token.
 
-- [ ] Installer `gesdinet/jwt-refresh-token-bundle`
-- [ ] Entity `RefreshToken` + migration
-- [ ] `POST /api/auth/refresh` — échange refresh token → nouvel access token
-- [ ] `POST /api/auth/logout` — révocation du refresh token
-- [ ] Tests PHPUnit : refresh valide, refresh expiré, logout + re-refresh refusé
-- [ ] CI GitHub Actions — lint + tests sur push `develop` et `main` *(reporté de Phase 0)*
+- [x] Installer `gesdinet/jwt-refresh-token-bundle` v2.0.0
+- [x] Entity `RefreshToken` + migration table `refresh_tokens`
+- [x] `POST /api/auth/refresh` — échange refresh token → nouvel access token
+- [x] `POST /api/auth/logout` — révocation du refresh token (JWT requis)
+- [x] Tests PHPUnit : login retourne refresh_token, refresh valide/invalide/expiré, logout + re-refresh refusé — 23/23 tests passants ✅
+- [x] CI GitHub Actions — workflow `tests.yml` sur push `develop` et `main` ✅
 
-**Livrable :** Cycle complet login → refresh → logout fonctionnel. CI verte sur GitHub.
+**Livrable :** Cycle complet login → refresh → logout fonctionnel. CI verte sur GitHub. ✅
 
 ---
 
@@ -279,7 +279,7 @@ Chaque projet (DartsOpen, FestManager…) étend ce socle avec ses propres entit
 |---|---|---|
 | Phase 0 — Socle | ✅ 2 sessions | ~~🔴 Critique~~ |
 | Phase 1 — Auth | ✅ 1 session | ~~🔴 Critique~~ |
-| Phase 1b — JWT Refresh | 1 session | 🔴 Critique |
+| Phase 1b — JWT Refresh | ✅ 1 session | ~~🔴 Critique~~ |
 | Phase 2 — Multi-tenancy | 2 sessions | 🟠 Haute |
 | Phase 3 — Mercure | 2 sessions | 🟠 Haute |
 | Phase 4 — Admin | 1-2 sessions | 🟡 Moyenne |
@@ -335,13 +335,13 @@ SterPlatform/
 
 ---
 
-## 9. Prochaine session — Phase 1b
+## 9. Prochaine session — Phase 2
 
 Actions concrètes pour démarrer :
 
-1. `composer require gesdinet/jwt-refresh-token-bundle`
-2. Entity `RefreshToken` + migration Doctrine
-3. `POST /api/auth/refresh` — retourne un nouvel access token
-4. `POST /api/auth/logout` — révoque le refresh token
-5. Tests PHPUnit couvrant refresh valide, expiré, et logout
-6. CI GitHub Actions — workflow `tests.yml` sur push `develop` + `main`
+1. Entités `Organization` + `OrganizationMember` + migrations
+2. `POST /api/organizations` — création organisation
+3. `TenantFilter` Doctrine Extension — filtre auto par `organization_id`
+4. `OrganizationVoter` — droits OWNER, ADMIN, MEMBER
+5. JWT payload enrichi avec `organization_id` courant
+6. Tests d'isolation inter-organisations
