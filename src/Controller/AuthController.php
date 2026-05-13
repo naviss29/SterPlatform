@@ -6,6 +6,7 @@ use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Service\MailerService;
 use Doctrine\ORM\EntityManagerInterface;
+use Gesdinet\JWTRefreshTokenBundle\Model\RefreshTokenManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -20,12 +21,20 @@ class AuthController extends AbstractController
         private readonly UserRepository $userRepository,
         private readonly UserPasswordHasherInterface $passwordHasher,
         private readonly MailerService $mailerService,
+        private readonly RefreshTokenManagerInterface $refreshTokenManager,
     ) {}
 
     #[Route('/login', name: 'api_auth_login', methods: ['POST'])]
     public function login(): never
     {
         // Intercepté par le firewall json_login — ce code n'est jamais atteint
+        throw new \LogicException('This route is handled by the security firewall.');
+    }
+
+    #[Route('/refresh', name: 'api_auth_refresh', methods: ['POST'])]
+    public function refresh(): never
+    {
+        // Intercepté par le firewall refresh_jwt — ce code n'est jamais atteint
         throw new \LogicException('This route is handled by the security firewall.');
     }
 
@@ -154,6 +163,22 @@ class AuthController extends AbstractController
         $this->em->flush();
 
         return $this->json(['message' => 'Mot de passe mis à jour avec succès.']);
+    }
+
+    #[Route('/logout', name: 'api_auth_logout', methods: ['POST'])]
+    public function logout(Request $request): JsonResponse
+    {
+        $data = json_decode($request->getContent(), true);
+        $tokenString = (string) ($data['refresh_token'] ?? '');
+
+        if ($tokenString) {
+            $refreshToken = $this->refreshTokenManager->get($tokenString);
+            if ($refreshToken) {
+                $this->refreshTokenManager->delete($refreshToken);
+            }
+        }
+
+        return $this->json(['message' => 'Déconnecté avec succès.']);
     }
 
     #[Route('/me', name: 'api_auth_me', methods: ['GET'])]

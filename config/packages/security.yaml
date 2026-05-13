@@ -24,6 +24,12 @@ security:
                 success_handler: lexik_jwt_authentication.handler.authentication_success
                 failure_handler: lexik_jwt_authentication.handler.authentication_failure
 
+        refresh:
+            pattern: ^/api/auth/refresh$
+            stateless: true
+            refresh_jwt:
+                check_path: /api/auth/refresh
+
         api:
             pattern: ^/api
             stateless: true
@@ -32,6 +38,7 @@ security:
 
     access_control:
         - { path: ^/api/auth/me$, roles: IS_AUTHENTICATED_FULLY }
+        - { path: ^/api/auth/logout$, roles: IS_AUTHENTICATED_FULLY }
         - { path: ^/api/auth, roles: PUBLIC_ACCESS }
         - { path: ^/api/docs, roles: PUBLIC_ACCESS }
         - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }
