@@ -17,6 +17,7 @@ class AuthControllerTest extends WebTestCase
         // createClient() doit être appelé en premier pour booter le kernel
         $this->client = static::createClient();
 
+        $this->em()->getConnection()->executeStatement('DELETE FROM refresh_tokens');
         $this->em()->getConnection()->executeStatement('DELETE FROM users');
     }
 
@@ -68,6 +69,17 @@ class AuthControllerTest extends WebTestCase
 
         $data = json_decode($this->client->getResponse()->getContent(), true);
         return $data['token'];
+    }
+
+    private function getRefreshToken(string $email = 'alan@example.com', string $password = 'password123'): string
+    {
+        $this->client->request('POST', '/api/auth/login', [], [], ['CONTENT_TYPE' => 'application/json'], json_encode([
+            'email' => $email,
+            'password' => $password,
+        ]));
+
+        $data = json_decode($this->client->getResponse()->getContent(), true);
+        return $data['refresh_token'];
     }
 
     // ------------------------------------------------------------------ register
@@ -285,6 +297,101 @@ class AuthControllerTest extends WebTestCase
     public function testMeUnauthorized(): void
     {
         $this->client->request('GET', '/api/auth/me');
+
+        $this->assertResponseStatusCodeSame(401);
+    }
+
+    // ------------------------------------------------------------------ login returns refresh token
+
+    public function testLoginReturnsRefreshToken(): void
+    {
+        $this->createVerifiedUser();
+
+        $this->client->request('POST', '/api/auth/login', [], [], ['CONTENT_TYPE' => 'application/json'], json_encode([
+            'email' => 'alan@example.com',
+            'password' => 'password123',
+        ]));
+
+        $this->assertResponseIsSuccessful();
+        $data = json_decode($this->client->getResponse()->getContent(), true);
+        $this->assertArrayHasKey('token', $data);
+        $this->assertArrayHasKey('refresh_token', $data);
+        $this->assertNotEmpty($data['refresh_token']);
+    }
+
+    // ------------------------------------------------------------------ refresh
+
+    public function testRefreshSuccess(): void
+    {
+        $this->createVerifiedUser();
+        $refreshToken = $this->getRefreshToken();
+
+        $this->client->request('POST', '/api/auth/refresh', [], [], ['CONTENT_TYPE' => 'application/json'], json_encode([
+            'refresh_token' => $refreshToken,
+        ]));
+
+        $this->assertResponseIsSuccessful();
+        $data = json_decode($this->client->getResponse()->getContent(), true);
+        $this->assertArrayHasKey('token', $data);
+        $this->assertNotEmpty($data['token']);
+    }
+
+    public function testRefreshWithInvalidToken(): void
+    {
+        $this->client->request('POST', '/api/auth/refresh', [], [], ['CONTENT_TYPE' => 'application/json'], json_encode([
+            'refresh_token' => 'invalid_refresh_token_xyz',
+        ]));
+
+        $this->assertResponseStatusCodeSame(401);
+    }
+
+    public function testRefreshWithExpiredToken(): void
+    {
+        $this->createVerifiedUser();
+
+        $this->em()->getConnection()->executeStatement(
+            "INSERT INTO refresh_tokens (refresh_token, username, valid) VALUES (:token, :username, :valid)",
+            [
+                'token' => 'expired_refresh_token_abc',
+                'username' => 'alan@example.com',
+                'valid' => (new \DateTime('-1 hour'))->format('Y-m-d H:i:s'),
+            ]
+        );
+
+        $this->client->request('POST', '/api/auth/refresh', [], [], ['CONTENT_TYPE' => 'application/json'], json_encode([
+            'refresh_token' => 'expired_refresh_token_abc',
+        ]));
+
+        $this->assertResponseStatusCodeSame(401);
+    }
+
+    // ------------------------------------------------------------------ logout
+
+    public function testLogoutSuccess(): void
+    {
+        $this->createVerifiedUser();
+        $jwtToken = $this->getJwtToken();
+        $refreshToken = $this->getRefreshToken();
+
+        $this->client->request('POST', '/api/auth/logout', [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_AUTHORIZATION' => 'Bearer ' . $jwtToken,
+        ], json_encode(['refresh_token' => $refreshToken]));
+
+        $this->assertResponseIsSuccessful();
+
+        // Le refresh token est révoqué — le refresh doit maintenant échouer
+        $this->client->request('POST', '/api/auth/refresh', [], [], ['CONTENT_TYPE' => 'application/json'], json_encode([
+            'refresh_token' => $refreshToken,
+        ]));
+        $this->assertResponseStatusCodeSame(401);
+    }
+
+    public function testLogoutWithoutJwtReturns401(): void
+    {
+        $this->client->request('POST', '/api/auth/logout', [], [], ['CONTENT_TYPE' => 'application/json'], json_encode([
+            'refresh_token' => 'any_token',
+        ]));
 
         $this->assertResponseStatusCodeSame(401);
     }
