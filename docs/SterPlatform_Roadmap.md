@@ -1,9 +1,9 @@
 # SterPlatform — Roadmap & Plan technique
 
-> Version : 0.3 — Phase 1 terminée
+> Version : 0.4 — Phase 1 terminée, Coolify prod opérationnel
 > Auteur : Alan
 > Date : Mai 2026
-> Statut : **Phase 1 terminée — Phase 2 à démarrer**
+> Statut : **Phase 1 terminée — Phase 1b à démarrer**
 
 ---
 
@@ -54,7 +54,7 @@ Supabase Free présente des limitations bloquantes :
 | Email | Symfony Mailer + Twig | Templates HTML, SMTP / Mailpit en dev |
 | Admin | EasyAdmin 4 | Dashboard rapide à générer depuis les entités |
 | Tests | PHPUnit + ApiTestCase | Tests unitaires + intégration API |
-| Base de données | PostgreSQL 16 | Même DB que Supabase — migration facilitée |
+| Base de données | PostgreSQL 18 | Même DB que Supabase — migration facilitée |
 | Containerisation | Docker + Docker Compose | Déploiement Coolify identique aux autres projets |
 | Déploiement | Coolify v4 (Nixpacks ou Dockerfile) | Infrastructure partagée Hetzner CX23 |
 
@@ -139,9 +139,9 @@ Chaque projet (DartsOpen, FestManager…) étend ce socle avec ses propres entit
 - [x] Doctrine ORM + LexikJWT + Security + Mailer installés
 - [x] JWT keypair générée (`config/jwt/private.pem` + `public.pem`)
 - [x] `git init`, remote GitHub `naviss29/SterPlatform`, branches `main` + `develop`
-- [ ] CI GitHub Actions (tests + lint sur push) *(à faire Phase 1)*
-- [ ] Coolify — app créée, déploiement depuis `main` *(à faire Phase 1)*
-- [ ] `.env.example` documenté *(à faire Phase 1)*
+- [ ] CI GitHub Actions (tests + lint sur push) *(reporté Phase 2)*
+- [x] Coolify — app créée, déploiement depuis `main`, domaine `sterplatform.bichetapps.com` ✅
+- [x] `.env.example` documenté ✅
 
 **Livrable :** `GET /api` renvoie `{"@context":"/api/contexts/Entrypoint","@id":"/api","@type":"Entrypoint"}` ✅
 
@@ -160,10 +160,25 @@ Chaque projet (DartsOpen, FestManager…) étend ce socle avec ses propres entit
 - [x] `GET /api/auth/me` — profil utilisateur connecté (JWT requis)
 - [x] Templates email Twig — `verification.html.twig`, `reset_password.html.twig`
 - [x] 17 tests PHPUnit passants (register, login, verify, forgot-password, reset-password, me)
-- [ ] `POST /api/auth/refresh` — renouvellement du JWT *(reporté Phase 1b)*
+- [ ] `POST /api/auth/refresh` — renouvellement du JWT *(→ Phase 1b)*
 - [ ] Rate limiting sur les endpoints sensibles *(reporté Phase 4)*
 
 **Livrable :** `POST /api/auth/register` + `POST /api/auth/login` → JWT fonctionnels. 17/17 tests passants ✅
+
+---
+
+### Phase 1b — JWT Refresh Token *(1 session)*
+
+**Objectif :** Compléter l'auth avec le renouvellement automatique du token.
+
+- [ ] Installer `gesdinet/jwt-refresh-token-bundle`
+- [ ] Entity `RefreshToken` + migration
+- [ ] `POST /api/auth/refresh` — échange refresh token → nouvel access token
+- [ ] `POST /api/auth/logout` — révocation du refresh token
+- [ ] Tests PHPUnit : refresh valide, refresh expiré, logout + re-refresh refusé
+- [ ] CI GitHub Actions — lint + tests sur push `develop` et `main` *(reporté de Phase 0)*
+
+**Livrable :** Cycle complet login → refresh → logout fonctionnel. CI verte sur GitHub.
 
 ---
 
@@ -262,15 +277,16 @@ Chaque projet (DartsOpen, FestManager…) étend ce socle avec ses propres entit
 
 | Phase | Durée estimée | Priorité |
 |---|---|---|
-| Phase 0 — Socle | ✅ 1 session | ~~🔴 Critique~~ |
+| Phase 0 — Socle | ✅ 2 sessions | ~~🔴 Critique~~ |
 | Phase 1 — Auth | ✅ 1 session | ~~🔴 Critique~~ |
+| Phase 1b — JWT Refresh | 1 session | 🔴 Critique |
 | Phase 2 — Multi-tenancy | 2 sessions | 🟠 Haute |
 | Phase 3 — Mercure | 2 sessions | 🟠 Haute |
 | Phase 4 — Admin | 1-2 sessions | 🟡 Moyenne |
 | Phase 5 — Migration DartsOpen | 4-5 sessions | 🟡 Moyenne (après Phase 3) |
 | Phase 6 — Multi-projets | 1-2 sessions | 🟢 Basse |
 
-**Total estimé : 14-19 sessions**
+**Total estimé : 15-21 sessions**
 
 ---
 
@@ -319,15 +335,13 @@ SterPlatform/
 
 ---
 
-## 9. Prochaine session — Phase 2
+## 9. Prochaine session — Phase 1b
 
 Actions concrètes pour démarrer :
 
-1. Entités `Organization` + `OrganizationMember` + migrations
-2. `POST /api/organizations` — création organisation
-3. `Doctrine Extension` `TenantFilter` — filtre auto par `organization_id`
-4. `OrganizationVoter` — droits OWNER, ADMIN, MEMBER
-5. JWT payload enrichi avec `organization_id` courant
-6. Tests d'isolation inter-organisations
-7. CI GitHub Actions (lint + tests sur push `develop` + `main`) *(reporté de Phase 1)*
-8. Créer l'app dans Coolify (branche `main`) *(reporté de Phase 1)*
+1. `composer require gesdinet/jwt-refresh-token-bundle`
+2. Entity `RefreshToken` + migration Doctrine
+3. `POST /api/auth/refresh` — retourne un nouvel access token
+4. `POST /api/auth/logout` — révoque le refresh token
+5. Tests PHPUnit couvrant refresh valide, expiré, et logout
+6. CI GitHub Actions — workflow `tests.yml` sur push `develop` + `main`
