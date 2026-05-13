@@ -1,9 +1,9 @@
 # SterPlatform — Documentation technique
 
-> Version : 0.4
+> Version : 0.5
 > Auteur : Alan
 > Date : Mai 2026
-> Statut : **Phase 1b terminée — JWT refresh + logout + CI GitHub Actions**
+> Statut : **Phase 2 terminée — Multi-tenancy opérationnel**
 
 ---
 
@@ -15,6 +15,7 @@
 | 0.2 | Mai 2026 | Phase 1 — Auth générique complète : entité User (UUID), migration, firewall JWT, endpoints register/verify/login/forgot-password/reset-password/me, MailerService + templates Twig, 17 tests PHPUnit passants |
 | 0.3 | Mai 2026 | Upgrade PostgreSQL 16 → 18 (tous les environnements), correction du point de montage volume PG18 (`/var/lib/postgresql` au lieu de `/var/lib/postgresql/data`), Dockerfile production multi-stage (PHP-FPM + Nginx + Supervisor), CI GitHub Actions, deploy webhook Coolify |
 | 0.4 | Mai 2026 | Phase 1b — JWT refresh token (`POST /api/auth/refresh`), logout avec révocation (`POST /api/auth/logout`), entité `RefreshToken` + migration, CI GitHub Actions opérationnel (tests + lint sur `develop` + `main`), 23 tests PHPUnit passants |
+| 0.5 | Mai 2026 | Phase 2 — Multi-tenancy : entités `Organization` + `OrganizationMember`, 5 endpoints REST, `TenantFilter` Doctrine (header `X-Organization-Slug`), `OrganizationVoter` (OWNER/ADMIN/MEMBER), 34/34 tests passants |
 
 ---
 
@@ -251,6 +252,7 @@ docker compose down -v
 | 16 | Mai 2026 | Upgrade PostgreSQL 16 → 18 | Mise à jour de `docker-compose.yml`, `docker-compose.prod.yml`, `.env`, `.env.example`, `ci.yml` : image `postgres:18-alpine`, `serverVersion=18` dans `DATABASE_URL`. Correction du point de montage volume (`/var/lib/postgresql` sans `/data` — breaking change PG18). Reset des volumes locaux (`docker compose down -v` + relance). |
 | 17 | Mai 2026 | Phase 1b — JWT Refresh Token + Logout | Installation `gesdinet/jwt-refresh-token-bundle` v2.0.0. Entité `RefreshToken` étend le `mapped-superclass` du bundle, table `refresh_tokens`. `POST /api/auth/refresh` géré par le firewall `refresh_jwt` (stub route nécessaire). `POST /api/auth/logout` révoque le refresh token via `RefreshTokenManagerInterface` (JWT requis). Login retourne désormais `token` + `refresh_token`. 6 tests ajoutés (23/23 passants). Bundle enregistré manuellement dans `bundles.php` (recipe Flex ignorée). |
 | 18 | Mai 2026 | CI GitHub Actions — workflow tests.yml | `.github/workflows/tests.yml` : déclenché sur push/PR vers `develop` et `main`. Service `postgres:18-alpine`, PHP 8.4 + extensions, cache Composer, génération JWT keypair, migration test, phpunit. `DATABASE_URL` injecté via env dans le workflow (pas de secrets requis pour les tests). |
+| 19 | Mai 2026 | Phase 2 — Multi-tenancy | Entités `Organization` (id UUID, name, slug unique, createdAt) + `OrganizationMember` (user FK, organization FK, role enum OWNER/ADMIN/MEMBER, joinedAt). 5 endpoints : `POST/GET /api/organizations`, `GET /api/organizations/{slug}`, `POST/GET /api/organizations/{slug}/members`. `TenantContext` service + `TenantSubscriber` (kernel.request, priorité 5) lit le header `X-Organization-Slug`, active le filtre Doctrine `tenant_filter`. `TenantFilter` filtre les entités ayant une association `organization`. `OrganizationVoter` avec 3 attributs : `ORGANIZATION_VIEW` (tout membre), `ORGANIZATION_MANAGE_MEMBERS` (OWNER+ADMIN), `ORGANIZATION_OWNER`. Signature Voter Symfony 8 inclut `?Vote $vote = null`. |
 
 ---
 
@@ -259,7 +261,8 @@ docker compose down -v
 - [x] Phase 0 — Socle technique (Symfony 8, Docker, API Platform 4, PostgreSQL 18, JWT, CI/CD GitHub Actions, Coolify)
 - [x] Phase 1 — Auth générique (User entity, register, verify, login, forgot-password, reset-password, me — 17 tests)
 - [x] Phase 1b — JWT refresh token + logout + CI GitHub Actions (23 tests)
-- [ ] Phase 2 — Multi-tenancy (Organization, TenantFilter, Voters)
+- [x] Phase 2 — Multi-tenancy (Organization, TenantFilter, OrganizationVoter — 34 tests)
+- [ ] Phase 3 — Mercure Real-time
 - [ ] Phase 3 — Mercure Real-time (MercurePublisher, EventSubscriber, exemples Next.js + Angular)
 - [ ] Phase 4 — Admin & Observabilité (EasyAdmin 4, /health, logs structurés)
 - [ ] Phase 5 — Migration DartsOpen (entités miroir Supabase, migration données, refactor frontend)

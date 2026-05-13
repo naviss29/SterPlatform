@@ -1,9 +1,9 @@
 # SterPlatform — Roadmap & Plan technique
 
-> Version : 0.5 — Phase 1b terminée, CI GitHub Actions opérationnel
+> Version : 0.6 — Phase 2 terminée, multi-tenancy opérationnel
 > Auteur : Alan
 > Date : Mai 2026
-> Statut : **Phase 1b terminée — Phase 2 à démarrer**
+> Statut : **Phase 2 terminée — Phase 3 (Mercure) à démarrer**
 
 ---
 
@@ -182,19 +182,22 @@ Chaque projet (DartsOpen, FestManager…) étend ce socle avec ses propres entit
 
 ---
 
-### Phase 2 — Multi-tenancy *(2 sessions)*
+### Phase 2 — Multi-tenancy ✅ *(terminée)*
 
 **Objectif :** Isolation des données par organisation/projet.
 
-- [ ] Entity `Organization` + `OrganizationMember` + migrations
-- [ ] `POST /api/organizations` — création organisation
-- [ ] `POST /api/organizations/{slug}/members` — invitation membre
-- [ ] Doctrine Extension `TenantFilter` — filtre auto par `organization_id`
-- [ ] Symfony Voters : `OrganizationVoter` (OWNER, ADMIN, MEMBER)
-- [ ] JWT payload enrichi avec `organization_id` courant
-- [ ] Tests d'isolation : un user ne voit pas les données d'une autre org
+- [x] Entity `Organization` + `OrganizationMember` + migrations
+- [x] `POST /api/organizations` — création organisation (créateur devient OWNER)
+- [x] `GET /api/organizations` — liste des organisations de l'utilisateur
+- [x] `GET /api/organizations/{slug}` — détail organisation (membres seulement)
+- [x] `POST /api/organizations/{slug}/members` — invitation membre (OWNER/ADMIN)
+- [x] `GET /api/organizations/{slug}/members` — liste des membres
+- [x] `TenantFilter` Doctrine — activé via header `X-Organization-Slug`, filtre auto par `organization_id`
+- [x] `TenantContext` + `TenantSubscriber` — résolution de l'org courante au `kernel.request`
+- [x] `OrganizationVoter` — droits OWNER, ADMIN, MEMBER (`ORGANIZATION_VIEW`, `ORGANIZATION_MANAGE_MEMBERS`, `ORGANIZATION_OWNER`)
+- [x] Tests d'isolation : un user ne voit pas les données d'une autre org — 34/34 tests passants ✅
 
-**Livrable :** Deux organisations créées en test — leurs données sont parfaitement isolées.
+**Livrable :** Deux organisations créées en test — leurs données sont parfaitement isolées. ✅
 
 ---
 
@@ -280,7 +283,7 @@ Chaque projet (DartsOpen, FestManager…) étend ce socle avec ses propres entit
 | Phase 0 — Socle | ✅ 2 sessions | ~~🔴 Critique~~ |
 | Phase 1 — Auth | ✅ 1 session | ~~🔴 Critique~~ |
 | Phase 1b — JWT Refresh | ✅ 1 session | ~~🔴 Critique~~ |
-| Phase 2 — Multi-tenancy | 2 sessions | 🟠 Haute |
+| Phase 2 — Multi-tenancy | ✅ 1 session | ~~🟠 Haute~~ |
 | Phase 3 — Mercure | 2 sessions | 🟠 Haute |
 | Phase 4 — Admin | 1-2 sessions | 🟡 Moyenne |
 | Phase 5 — Migration DartsOpen | 4-5 sessions | 🟡 Moyenne (après Phase 3) |
@@ -335,13 +338,13 @@ SterPlatform/
 
 ---
 
-## 9. Prochaine session — Phase 2
+## 9. Prochaine session — Phase 3
 
 Actions concrètes pour démarrer :
 
-1. Entités `Organization` + `OrganizationMember` + migrations
-2. `POST /api/organizations` — création organisation
-3. `TenantFilter` Doctrine Extension — filtre auto par `organization_id`
-4. `OrganizationVoter` — droits OWNER, ADMIN, MEMBER
-5. JWT payload enrichi avec `organization_id` courant
-6. Tests d'isolation inter-organisations
+1. Vérifier que le hub Mercure est bien configuré dans `docker-compose.yml`
+2. Créer `MercurePublisher` service (publie sur un topic avec JWT signé)
+3. Créer `DoctrineEventSubscriber` — publication automatique à chaque flush Doctrine
+4. Endpoint `GET /api/mercure/token` — retourne un JWT Mercure pour le client
+5. Exemple côté Next.js : `EventSource` abonné à un topic organisationnel
+6. Tests : publication → réception en temps réel
