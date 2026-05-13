@@ -13,7 +13,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:18-alpine
         env:
           POSTGRES_DB: sterplatform
           POSTGRES_USER: sterplatform
@@ -27,7 +27,7 @@ jobs:
           - 5432:5432
 
     env:
-      DATABASE_URL: postgresql://sterplatform:sterplatform@127.0.0.1:5432/sterplatform?serverVersion=16&charset=utf8
+      DATABASE_URL: postgresql://sterplatform:sterplatform@127.0.0.1:5432/sterplatform?serverVersion=18&charset=utf8
       APP_ENV: test
       APP_SECRET: ci_test_secret_not_used_in_prod
       JWT_PASSPHRASE: ci_test_jwt_passphrase
