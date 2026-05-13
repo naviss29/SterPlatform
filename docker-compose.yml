@@ -25,7 +25,7 @@ services:
       - php
 
   db:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-sterplatform}
       POSTGRES_USER: ${POSTGRES_USER:-sterplatform}
@@ -35,7 +35,7 @@ services:
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sterplatform}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sterplatform} -d ${POSTGRES_DB:-sterplatform}"]
       interval: 5s
       timeout: 5s
       retries: 10
