@@ -160,7 +160,7 @@ Chaque projet (DartsOpen, FestManager…) étend ce socle avec ses propres entit
 - [x] `GET /api/auth/me` — profil utilisateur connecté (JWT requis)
 - [x] Templates email Twig — `verification.html.twig`, `reset_password.html.twig`
 - [x] 17 tests PHPUnit passants (register, login, verify, forgot-password, reset-password, me)
-- [ ] `POST /api/auth/refresh` — renouvellement du JWT *(→ Phase 1b)*
+- [x] `POST /api/auth/refresh` — renouvellement du JWT *(fait en Phase 1b)*
 - [ ] Rate limiting sur les endpoints sensibles *(reporté Phase 4)*
 
 **Livrable :** `POST /api/auth/register` + `POST /api/auth/login` → JWT fonctionnels. 17/17 tests passants ✅
