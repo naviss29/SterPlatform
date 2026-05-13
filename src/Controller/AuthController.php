@@ -46,12 +46,12 @@ class AuthController extends AbstractController
         $email = trim((string) ($data['email'] ?? ''));
         $password = (string) ($data['password'] ?? '');
 
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($email) > 180) {
             return $this->json(['error' => 'Email invalide.'], 400);
         }
 
-        if (strlen($password) < 8) {
-            return $this->json(['error' => 'Le mot de passe doit contenir au moins 8 caractères.'], 400);
+        if (strlen($password) < 8 || strlen($password) > 4096) {
+            return $this->json(['error' => 'Le mot de passe doit contenir entre 8 et 4096 caractères.'], 400);
         }
 
         if ($this->userRepository->findByEmail($email)) {
@@ -143,8 +143,8 @@ class AuthController extends AbstractController
             return $this->json(['error' => 'Token manquant.'], 400);
         }
 
-        if (strlen($password) < 8) {
-            return $this->json(['error' => 'Le mot de passe doit contenir au moins 8 caractères.'], 400);
+        if (strlen($password) < 8 || strlen($password) > 4096) {
+            return $this->json(['error' => 'Le mot de passe doit contenir entre 8 et 4096 caractères.'], 400);
         }
 
         $user = $this->userRepository->findByResetToken($token);
