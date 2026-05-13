@@ -37,8 +37,8 @@ class OrganizationController extends AbstractController
         $data = json_decode($request->getContent(), true);
         $name = trim((string) ($data['name'] ?? ''));
 
-        if (strlen($name) < 2) {
-            return $this->json(['error' => 'Le nom doit contenir au moins 2 caractères.'], 400);
+        if (strlen($name) < 2 || strlen($name) > 100) {
+            return $this->json(['error' => 'Le nom doit contenir entre 2 et 100 caractères.'], 400);
         }
 
         $slug = strtolower((string) $this->slugger->slug($name));
