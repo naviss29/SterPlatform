@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [develop, main]
+
+jobs:
+  tests:
+    name: Tests PHPUnit
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: sterplatform
+          POSTGRES_USER: sterplatform
+          POSTGRES_PASSWORD: sterplatform
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 5432:5432
+
+    env:
+      DATABASE_URL: postgresql://sterplatform:sterplatform@127.0.0.1:5432/sterplatform?serverVersion=16&charset=utf8
+      APP_ENV: test
+      APP_SECRET: ci_test_secret_not_used_in_prod
+      JWT_PASSPHRASE: ci_test_jwt_passphrase
+      APP_URL: http://localhost
+      APP_FROM_EMAIL: noreply@ci.local
+      MAILER_DSN: "null://null"
+      MERCURE_JWT_SECRET: ci_mercure_secret
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP 8.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo, pdo_pgsql, intl, zip, opcache
+          coverage: none
+
+      - name: Cache Composer
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: composer-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Generate JWT keys
+        run: php bin/console lexik:jwt:generate-keypair --overwrite --no-interaction
+
+      - name: Create test database
+        run: php bin/console doctrine:database:create --env=test --no-interaction
+
+      - name: Run migrations
+        run: php bin/console doctrine:migrations:migrate --env=test --no-interaction
+
+      - name: Run tests
+        run: php bin/phpunit
