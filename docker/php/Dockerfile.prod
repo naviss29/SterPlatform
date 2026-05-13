@@ -1,0 +1,29 @@
+FROM php:8.4-fpm
+
+RUN apt-get update && apt-get install -y \
+    git curl zip unzip libpq-dev libicu-dev libzip-dev \
+    && docker-php-ext-install pdo pdo_pgsql intl zip opcache \
+    && pecl install apcu \
+    && docker-php-ext-enable apcu \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+WORKDIR /var/www/html
+
+# Copier uniquement les fichiers nécessaires à composer d'abord (meilleur cache Docker)
+COPY composer.json composer.lock ./
+
+RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts
+
+# Copier le reste de l'application
+COPY . .
+
+# Finaliser l'autoload après la copie complète
+RUN composer dump-autoload --no-dev --optimize
+
+COPY docker/php/php.ini /usr/local/etc/php/conf.d/custom.ini
+COPY docker/php/php.prod.ini /usr/local/etc/php/conf.d/prod.ini
+
+# Droits sur var/ (cache, logs)
+RUN mkdir -p var && chown -R www-data:www-data var

@@ -1,0 +1,55 @@
+services:
+  php:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    volumes:
+      - .:/var/www/html
+      - vendor_data:/var/www/html/vendor
+    env_file:
+      - .env
+    environment:
+      APP_ENV: dev
+    depends_on:
+      db:
+        condition: service_healthy
+
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - .:/var/www/html
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - php
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-sterplatform}
+      POSTGRES_USER: ${POSTGRES_USER:-sterplatform}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sterplatform}
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sterplatform}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mercure:
+    image: dunglas/mercure
+    environment:
+      SERVER_NAME: ':80'
+      MERCURE_PUBLISHER_JWT_KEY: '${MERCURE_JWT_SECRET:-sterplatform_mercure_secret}'
+      MERCURE_SUBSCRIBER_JWT_KEY: '${MERCURE_JWT_SECRET:-sterplatform_mercure_secret}'
+    ports:
+      - "9090:80"
+    command: /usr/bin/caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
+
+volumes:
+  db_data:
+  vendor_data:

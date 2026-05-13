@@ -1,9 +1,9 @@
 # SterPlatform — Roadmap & Plan technique
 
-> Version : 0.1 — Document de planification initial
+> Version : 0.3 — Phase 1 terminée
 > Auteur : Alan
 > Date : Mai 2026
-> Statut : **Planification**
+> Statut : **Phase 1 terminée — Phase 2 à démarrer**
 
 ---
 
@@ -46,15 +46,15 @@ Supabase Free présente des limitations bloquantes :
 
 | Couche | Technologie | Justification |
 |---|---|---|
-| Framework | Symfony 7.2 (PHP 8.3) | Mature, performant, écosystème riche |
-| API | API Platform 3 | Génère REST + OpenAPI depuis les entités Doctrine — équivalent Supabase auto-API |
+| Framework | Symfony 8.0 (PHP 8.4) | Mature, performant, écosystème riche |
+| API | API Platform 4 | Génère REST + OpenAPI depuis les entités Doctrine — équivalent Supabase auto-API |
 | ORM | Doctrine ORM 3 | Migrations, repositories, relations — équivalent Hibernate |
-| Auth | LexikJWTAuthenticationBundle | JWT access + refresh tokens, standard industrie |
+| Auth | LexikJWTAuthenticationBundle 3 | JWT access + refresh tokens, standard industrie |
 | Temps réel | Mercure (hub) | SSE pub/sub, inventé par l'équipe Symfony, facile à déployer |
-| Email | Symfony Mailer + Twig | Templates HTML, SMTP/SendGrid/Mailgun |
+| Email | Symfony Mailer + Twig | Templates HTML, SMTP / Mailpit en dev |
 | Admin | EasyAdmin 4 | Dashboard rapide à générer depuis les entités |
 | Tests | PHPUnit + ApiTestCase | Tests unitaires + intégration API |
-| Base de données | PostgreSQL 15 | Même DB que Supabase — migration facilitée |
+| Base de données | PostgreSQL 16 | Même DB que Supabase — migration facilitée |
 | Containerisation | Docker + Docker Compose | Déploiement Coolify identique aux autres projets |
 | Déploiement | Coolify v4 (Nixpacks ou Dockerfile) | Infrastructure partagée Hetzner CX23 |
 
@@ -72,7 +72,7 @@ Supabase Free présente des limitations bloquantes :
 │  └──────┬───────┘  └──────┬───────┘                │
 │         │                 │                         │
 │  ┌──────▼─────────────────▼───────┐                │
-│  │         Symfony 7 Core          │                │
+│  │         Symfony 8 Core          │                │
 │  │  Security │ Mailer │ Messenger  │                │
 │  └──────────────┬─────────────────┘                │
 │                 │                                   │
@@ -129,39 +129,41 @@ Chaque projet (DartsOpen, FestManager…) étend ce socle avec ses propres entit
 
 ## 5. Roadmap
 
-### Phase 0 — Socle technique *(2-3 sessions)*
+### Phase 0 — Socle technique ✅ *(terminée)*
 
 **Objectif :** Symfony opérationnel avec Docker, API Platform et PostgreSQL.
 
-- [ ] `symfony new SterPlatform --webapp`
-- [ ] Docker Compose : PHP 8.3-fpm, PostgreSQL 15, Nginx, Mercure
-- [ ] API Platform 3 installé et configuré
-- [ ] Doctrine ORM + première migration
-- [ ] `git init`, remote GitHub, branches `main` + `develop`
-- [ ] CI GitHub Actions (tests + lint sur push)
-- [ ] Coolify — app créée, déploiement depuis `main`
-- [ ] `.env.example` documenté
+- [x] Scaffold Symfony 8 via Docker (sans PHP local) — `composer create-project symfony/skeleton`
+- [x] Docker Compose : PHP 8.4-fpm, PostgreSQL 16, Nginx 1.27, Mercure, Mailpit
+- [x] API Platform 4 installé et configuré
+- [x] Doctrine ORM + LexikJWT + Security + Mailer installés
+- [x] JWT keypair générée (`config/jwt/private.pem` + `public.pem`)
+- [x] `git init`, remote GitHub `naviss29/SterPlatform`, branches `main` + `develop`
+- [ ] CI GitHub Actions (tests + lint sur push) *(à faire Phase 1)*
+- [ ] Coolify — app créée, déploiement depuis `main` *(à faire Phase 1)*
+- [ ] `.env.example` documenté *(à faire Phase 1)*
 
-**Livrable :** `GET /api` renvoie le JSON-LD de l'API Platform. `GET /api/docs` ouvre le Swagger UI.
+**Livrable :** `GET /api` renvoie `{"@context":"/api/contexts/Entrypoint","@id":"/api","@type":"Entrypoint"}` ✅
 
 ---
 
-### Phase 1 — Auth générique *(2-3 sessions)*
+### Phase 1 — Auth générique ✅ *(terminée)*
 
 **Objectif :** Système d'authentification complet, réutilisable par tous les projets.
 
-- [ ] Entity `User` + migration
-- [ ] `POST /api/auth/register` — inscription + envoi email de confirmation
-- [ ] `GET /auth/confirm?token=` — activation du compte
-- [ ] `POST /api/auth/login` → JWT access token (15 min) + refresh token (7 jours)
-- [ ] `POST /api/auth/refresh` — renouvellement du JWT
-- [ ] `POST /api/auth/forgot-password` — envoi email reset
-- [ ] `POST /api/auth/reset-password` — nouveau mot de passe via token
-- [ ] Rate limiting sur les endpoints sensibles (Symfony RateLimiter)
-- [ ] Templates email Twig (confirmation, reset) — style identique DartsOpen
-- [ ] Tests PHPUnit : register, login, refresh, reset
+- [x] Entity `User` (UUID, email, password bcrypt, roles, isVerified, verificationToken, resetToken, createdAt) + migration
+- [x] `POST /api/auth/register` — inscription + envoi email de confirmation (réponse générique anti-énumération)
+- [x] `GET /api/auth/verify?token=` — activation du compte via token 24h
+- [x] `POST /api/auth/login` → JWT access token (firewall json_login + LexikJWT)
+- [x] `POST /api/auth/forgot-password` — envoi email reset (réponse générique)
+- [x] `POST /api/auth/reset-password` — nouveau mot de passe via token 1h
+- [x] `GET /api/auth/me` — profil utilisateur connecté (JWT requis)
+- [x] Templates email Twig — `verification.html.twig`, `reset_password.html.twig`
+- [x] 17 tests PHPUnit passants (register, login, verify, forgot-password, reset-password, me)
+- [ ] `POST /api/auth/refresh` — renouvellement du JWT *(reporté Phase 1b)*
+- [ ] Rate limiting sur les endpoints sensibles *(reporté Phase 4)*
 
-**Livrable :** Flux auth complet testable via Swagger UI ou Postman.
+**Livrable :** `POST /api/auth/register` + `POST /api/auth/login` → JWT fonctionnels. 17/17 tests passants ✅
 
 ---
 
@@ -260,8 +262,8 @@ Chaque projet (DartsOpen, FestManager…) étend ce socle avec ses propres entit
 
 | Phase | Durée estimée | Priorité |
 |---|---|---|
-| Phase 0 — Socle | 2-3 sessions | 🔴 Critique |
-| Phase 1 — Auth | 2-3 sessions | 🔴 Critique |
+| Phase 0 — Socle | ✅ 1 session | ~~🔴 Critique~~ |
+| Phase 1 — Auth | ✅ 1 session | ~~🔴 Critique~~ |
 | Phase 2 — Multi-tenancy | 2 sessions | 🟠 Haute |
 | Phase 3 — Mercure | 2 sessions | 🟠 Haute |
 | Phase 4 — Admin | 1-2 sessions | 🟡 Moyenne |
@@ -317,13 +319,15 @@ SterPlatform/
 
 ---
 
-## 9. Prochaine session — Phase 0
+## 9. Prochaine session — Phase 2
 
 Actions concrètes pour démarrer :
 
-1. `symfony new SterPlatform --webapp` dans `C:\Users\yveno\Documents\Devs\`
-2. Installer API Platform : `composer require api`
-3. Configurer Docker Compose (PHP, PostgreSQL, Nginx, Mercure)
-4. `git init` → remote GitHub `naviss29/SterPlatform`
-5. Créer les branches `main` + `develop`
-6. Créer l'app dans Coolify (branche `main`)
+1. Entités `Organization` + `OrganizationMember` + migrations
+2. `POST /api/organizations` — création organisation
+3. `Doctrine Extension` `TenantFilter` — filtre auto par `organization_id`
+4. `OrganizationVoter` — droits OWNER, ADMIN, MEMBER
+5. JWT payload enrichi avec `organization_id` courant
+6. Tests d'isolation inter-organisations
+7. CI GitHub Actions (lint + tests sur push `develop` + `main`) *(reporté de Phase 1)*
+8. Créer l'app dans Coolify (branche `main`) *(reporté de Phase 1)*
