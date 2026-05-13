@@ -1,9 +1,9 @@
 # SterPlatform — Roadmap & Plan technique
 
-> Version : 0.7 — Phase 3 terminée, Mercure Real-time opérationnel
+> Version : 0.8 — Phase 3b terminée, N+1 éliminés
 > Auteur : Alan
 > Date : Mai 2026
-> Statut : **Phase 3 terminée — Phase 3b (Refacto + N+1) à démarrer**
+> Statut : **Phase 3b terminée — Phase 4 (Admin & Observabilité) à démarrer**
 
 ---
 
@@ -218,21 +218,25 @@ Chaque projet (DartsOpen, FestManager…) étend ce socle avec ses propres entit
 
 ---
 
-### Phase 3b — Refacto & Élimination N+1 *(1 session)*
+### Phase 3b — Refacto & Élimination N+1 ✅ *(terminée)*
 
 **Objectif :** Assainir les requêtes, éliminer les problèmes N+1, et améliorer la lisibilité du code.
 
-- [ ] Audit des requêtes N+1 dans `OrganizationController`
-  - `list()` — charge chaque membership séparément (N+1 sur `findMembership`)
-  - `listMembers()` — lazy load des users de chaque member
-- [ ] `OrganizationRepository::findByUserWithRole()` — JOIN FETCH membership + org en une requête
-- [ ] `OrganizationMemberRepository::findMembershipsForUser()` — batch fetch pour `list()`
-- [ ] Revue de `TenantSubscriber` — vérifier si `hasRole()` génère des requêtes excessives
-- [ ] Ajouter des index manquants sur `organization_members` (user_id, organization_id déjà indexés par FK ?)
-- [ ] Profiler avec Symfony Profiler / `EXPLAIN ANALYZE` en dev
-- [ ] Nettoyer les imports inutilisés, uniformiser les styles de code
+- [x] Audit N+1 : `list()` (N×`findMembership`) + `listMembers()` (N×lazy `getUser()`) + `TenantSubscriber` (2 requêtes séquentielles) ✅
+- [x] `OrganizationMemberRepository::findByUserWithOrganization()` — JOIN FETCH org, remplace `findByUser + N×findMembership` dans `list()` ✅
+- [x] `OrganizationMemberRepository::findByOrganizationWithUser()` — JOIN FETCH user, remplace `$org->getMembers() + N×getUser()` dans `listMembers()` ✅
+- [x] `OrganizationMemberRepository::findMembershipByOrgSlug()` — JOIN org+membership en 1 requête, remplace `findBySlug + hasRole` dans `TenantSubscriber` ✅
+- [x] `TenantSubscriber` simplifié — injection `OrganizationRepository` supprimée ✅
+- [x] Index confirmés : `slug` unique, FK `user_id` + `organization_id`, unique constraint `(user_id, organization_id)` — tout couvert ✅
+- [x] `EXPLAIN ANALYZE` validé : Index Scan sur slug + Bitmap Index sur user_id — aucun Seq Scan sur les tables critiques ✅
+- [x] 40/40 tests passants après refacto ✅
 
-**Livrable :** Aucune requête N+1 détectée via profiler. `OrganizationController::list()` résolu en ≤ 2 requêtes SQL.
+**Résultat :**
+| Endpoint | Avant | Après |
+|---|---|---|
+| `GET /api/organizations` | 1 + N requêtes | **1 requête** (JOIN FETCH) |
+| `GET /api/organizations/{slug}/members` | 1 + N requêtes | **1 requête** (JOIN FETCH) |
+| `X-Organization-Slug` header (par request) | 2 requêtes | **1 requête** (JOIN combiné) |
 
 ---
 
@@ -304,7 +308,7 @@ Chaque projet (DartsOpen, FestManager…) étend ce socle avec ses propres entit
 | Phase 1b — JWT Refresh | ✅ 1 session | ~~🔴 Critique~~ |
 | Phase 2 — Multi-tenancy | ✅ 1 session | ~~🟠 Haute~~ |
 | Phase 3 — Mercure | ✅ 1 session | ~~🟠 Haute~~ |
-| Phase 3b — Refacto + N+1 | 1 session | 🟠 Haute |
+| Phase 3b — Refacto + N+1 | ✅ 1 session | ~~🟠 Haute~~ |
 | Phase 4 — Admin | 1-2 sessions | 🟡 Moyenne |
 | Phase 5 — Migration DartsOpen | 4-5 sessions | 🟡 Moyenne (après Phase 3b) |
 | Phase 6 — Multi-projets | 1-2 sessions | 🟢 Basse |
@@ -358,13 +362,11 @@ SterPlatform/
 
 ---
 
-## 9. Prochaine session — Phase 3b
+## 9. Prochaine session — Phase 4
 
 Actions concrètes pour démarrer :
 
-1. Profiler `OrganizationController::list()` avec le Symfony Profiler — identifier les requêtes N+1
-2. Créer `OrganizationRepository::findByUserWithRole()` en JOIN FETCH pour éliminer le N+1 sur `findMembership`
-3. Vérifier les index FK sur `organization_members` (`user_id`, `organization_id`)
-4. Profiler `TenantSubscriber::onKernelRequest()` — valider que `hasRole()` ne génère pas de sur-requêtes
-5. Nettoyer les imports inutilisés dans tous les fichiers `src/`
-6. Lancer `EXPLAIN ANALYZE` sur les requêtes critiques via Doctrine profiler
+1. Installer `easyadmin/easyadmin-bundle` — CRUD User + Organization
+2. Créer `GET /health` — vérifie DB (doctrine ping) + Mercure hub (HTTP check)
+3. Configurer Monolog pour logs JSON structurés en prod (`formatter: json`)
+4. Ajouter métriques basiques : middleware comptage requêtes + erreurs 5xx via EventSubscriber

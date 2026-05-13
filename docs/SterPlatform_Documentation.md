@@ -1,9 +1,9 @@
 # SterPlatform — Documentation technique
 
-> Version : 0.6
+> Version : 0.7
 > Auteur : Alan
 > Date : Mai 2026
-> Statut : **Phase 3 terminée — Mercure Real-time opérationnel**
+> Statut : **Phase 3b terminée — N+1 éliminés, base prête pour Phase 4**
 
 ---
 
@@ -17,6 +17,7 @@
 | 0.4 | Mai 2026 | Phase 1b — JWT refresh token (`POST /api/auth/refresh`), logout avec révocation (`POST /api/auth/logout`), entité `RefreshToken` + migration, CI GitHub Actions opérationnel (tests + lint sur `develop` + `main`), 23 tests PHPUnit passants |
 | 0.5 | Mai 2026 | Phase 2 — Multi-tenancy : entités `Organization` + `OrganizationMember`, 5 endpoints REST, `TenantFilter` Doctrine (header `X-Organization-Slug`), `OrganizationVoter` (OWNER/ADMIN/MEMBER), 34/34 tests passants |
 | 0.6 | Mai 2026 | Phase 3 — Mercure Real-time : `symfony/mercure-bundle` v0.4.2, `MercurePublisher`, `DoctrinePublishSubscriber`, `GET /api/mercure/token`, fix `MERCURE_JWT_SECRET` (256 bits min), 40/40 tests passants |
+| 0.7 | Mai 2026 | Phase 3b — Élimination N+1 : `findByUserWithOrganization`, `findByOrganizationWithUser`, `findMembershipByOrgSlug`, `TenantSubscriber` simplifié (OrganizationRepository supprimé), EXPLAIN validé, 40/40 tests passants |
 
 ---
 
@@ -255,6 +256,7 @@ docker compose down -v
 | 18 | Mai 2026 | CI GitHub Actions — workflow tests.yml | `.github/workflows/tests.yml` : déclenché sur push/PR vers `develop` et `main`. Service `postgres:18-alpine`, PHP 8.4 + extensions, cache Composer, génération JWT keypair, migration test, phpunit. `DATABASE_URL` injecté via env dans le workflow (pas de secrets requis pour les tests). |
 | 19 | Mai 2026 | Phase 2 — Multi-tenancy | Entités `Organization` (id UUID, name, slug unique, createdAt) + `OrganizationMember` (user FK, organization FK, role enum OWNER/ADMIN/MEMBER, joinedAt). 5 endpoints : `POST/GET /api/organizations`, `GET /api/organizations/{slug}`, `POST/GET /api/organizations/{slug}/members`. `TenantContext` service + `TenantSubscriber` (kernel.request, priorité 5) lit le header `X-Organization-Slug`, active le filtre Doctrine `tenant_filter`. `TenantFilter` filtre les entités ayant une association `organization`. `OrganizationVoter` avec 3 attributs : `ORGANIZATION_VIEW` (tout membre), `ORGANIZATION_MANAGE_MEMBERS` (OWNER+ADMIN), `ORGANIZATION_OWNER`. Signature Voter Symfony 8 inclut `?Vote $vote = null`. |
 | 20 | Mai 2026 | Phase 3 — Mercure Real-time | `symfony/mercure-bundle` v0.4.2 installé. `config/packages/mercure.yaml` : hub `default` avec `url` (interne Docker `http://mercure/.well-known/mercure`) et `public_url` (browser `http://localhost:9090/.well-known/mercure`). `MercurePublisher` service : publie un `Update` Mercure sur les topics `orgs/{slug}` et `orgs/{slug}/{entityType}`. `DoctrinePublishSubscriber` : écoute `postPersist/postUpdate/postRemove` Doctrine, publie automatiquement pour toute entité ayant `getOrganization()` — échec silencieux si hub indisponible. `GET /api/mercure/token` : génère un JWT subscriber via `TokenFactoryInterface $defaultTokenFactory` (autowire Symfony Mercure v0.4), scopé aux topics des orgs de l'utilisateur. Correction `MERCURE_JWT_SECRET` : minimum 256 bits (32 chars) dans `.env`, `.env.test`, `docker-compose.yml`. 6 nouveaux tests (40/40 passants). |
+| 21 | Mai 2026 | Phase 3b — Élimination N+1 | `OrganizationMemberRepository` : 3 nouvelles méthodes avec JOIN FETCH. `findByUserWithOrganization(User)` → `OrganizationMember[]` avec org hydratée (remplace `list()` N+1). `findByOrganizationWithUser(Organization)` → `OrganizationMember[]` avec user hydraté (remplace `listMembers()` N+1). `findMembershipByOrgSlug(User, slug)` → membership + org en 1 requête JOIN (remplace `TenantSubscriber` 2-requêtes). `TenantSubscriber` simplifié : injection `OrganizationRepository` supprimée. `EXPLAIN ANALYZE` validé sur chaque requête critique : Index Scan slug, Bitmap Index user_id. Index existants confirmés suffisants (FK + unique constraint). 40/40 tests passants inchangés. |
 
 ---
 
@@ -265,7 +267,7 @@ docker compose down -v
 - [x] Phase 1b — JWT refresh token + logout + CI GitHub Actions (23 tests)
 - [x] Phase 2 — Multi-tenancy (Organization, TenantFilter, OrganizationVoter — 34 tests)
 - [x] Phase 3 — Mercure Real-time (MercurePublisher, DoctrinePublishSubscriber, GET /api/mercure/token — 40 tests)
-- [ ] Phase 3b — Refacto & Élimination N+1 (audit requêtes, JOIN FETCH, index FK)
+- [x] Phase 3b — Refacto & Élimination N+1 (findByUserWithOrganization, findByOrganizationWithUser, findMembershipByOrgSlug — 40 tests)
 - [ ] Phase 4 — Admin & Observabilité (EasyAdmin 4, /health, logs structurés)
 - [ ] Phase 5 — Migration DartsOpen (entités miroir Supabase, migration données, refactor frontend)
 - [ ] Phase 6 — Production multi-projets (guide intégration, versioning API, OpenAPI publique)

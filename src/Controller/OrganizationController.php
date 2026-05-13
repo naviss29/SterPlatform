@@ -69,12 +69,12 @@ class OrganizationController extends AbstractController
         /** @var User $user */
         $user = $this->getUser();
 
-        $organizations = $this->organizationRepository->findByUser($user);
+        $memberships = $this->memberRepository->findByUserWithOrganization($user);
 
-        $data = array_map(function (Organization $org) use ($user) {
-            $membership = $this->memberRepository->findMembership($user, $org);
-            return $this->serializeOrg($org, $membership?->getRole());
-        }, $organizations);
+        $data = array_map(
+            fn (OrganizationMember $m) => $this->serializeOrg($m->getOrganization(), $m->getRole()),
+            $memberships
+        );
 
         return $this->json($data);
     }
@@ -153,7 +153,7 @@ class OrganizationController extends AbstractController
             'email'    => $m->getUser()->getEmail(),
             'role'     => $m->getRole()->value,
             'joinedAt' => $m->getJoinedAt()->format(\DateTimeInterface::ATOM),
-        ], $organization->getMembers()->toArray());
+        ], $this->memberRepository->findByOrganizationWithUser($organization));
 
         return $this->json($members);
     }
