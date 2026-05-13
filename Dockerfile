@@ -35,8 +35,12 @@ COPY --from=vendor /app/vendor ./vendor
 # Code source
 COPY . .
 
+# Composer binary pour dump-autoload, puis supprimé
+COPY --from=vendor /usr/bin/composer /usr/local/bin/composer
+
 # Finaliser l'autoload avec le code source complet
-RUN composer dump-autoload --no-dev --optimize --no-interaction
+RUN composer dump-autoload --no-dev --optimize --no-interaction \
+    && rm /usr/local/bin/composer
 
 # Configurations
 COPY docker/nginx/nginx.prod.conf /etc/nginx/sites-available/default
