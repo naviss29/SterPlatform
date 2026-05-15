@@ -1,9 +1,9 @@
 # SterPlatform — Documentation technique
 
-> Version : 0.7
+> Version : 0.8
 > Auteur : Alan
 > Date : Mai 2026
-> Statut : **Phase 3b terminée — N+1 éliminés, base prête pour Phase 4**
+> Statut : **Phase 4 terminée — Admin EasyAdmin, /health, métriques, CI/CD pipeline complet**
 
 ---
 
@@ -18,6 +18,7 @@
 | 0.5 | Mai 2026 | Phase 2 — Multi-tenancy : entités `Organization` + `OrganizationMember`, 5 endpoints REST, `TenantFilter` Doctrine (header `X-Organization-Slug`), `OrganizationVoter` (OWNER/ADMIN/MEMBER), 34/34 tests passants |
 | 0.6 | Mai 2026 | Phase 3 — Mercure Real-time : `symfony/mercure-bundle` v0.4.2, `MercurePublisher`, `DoctrinePublishSubscriber`, `GET /api/mercure/token`, fix `MERCURE_JWT_SECRET` (256 bits min), 40/40 tests passants |
 | 0.7 | Mai 2026 | Phase 3b — Élimination N+1 : `findByUserWithOrganization`, `findByOrganizationWithUser`, `findMembershipByOrgSlug`, `TenantSubscriber` simplifié (OrganizationRepository supprimé), EXPLAIN validé, 40/40 tests passants |
+| 0.8 | Mai 2026 | CI/CD + Phase 4 — Pipeline fusionné `ci-cd.yml` (tests → deploy conditionnel), deploy prod `main` + staging `develop`, EasyAdmin v5 (`/admin` CRUD User + Organization), `app:user:promote`, `GET /health` (DB + Mercure), `RequestMetricsSubscriber` (logs JSON structurés par requête), MonologBundle JSON prod |
 
 ---
 
@@ -53,7 +54,7 @@ Un seul backend sert tous les projets (DartsOpen, FestManager, futurs projets) s
 | Auth | LexikJWTAuthenticationBundle 3 + gesdinet/jwt-refresh-token-bundle 2 | JWT access token + refresh token persisté en base, standard industrie |
 | Temps réel | Mercure (hub dunglas) | SSE pub/sub, inventé par l'équipe Symfony |
 | Email | Symfony Mailer + Twig | Templates HTML, SMTP / Mailpit en dev |
-| Admin | EasyAdmin 4 | Dashboard rapide à générer depuis les entités *(Phase 4)* |
+| Admin | EasyAdmin 5 (v5.0.8) | Dashboard `/admin` — CRUD User + Organization, login session-based |
 | Tests | PHPUnit + ApiTestCase | Tests unitaires + intégration API |
 | Base de données | PostgreSQL 18 | Version LTS la plus récente — même famille que Supabase |
 | Containerisation | Docker + Docker Compose | Déploiement identique aux autres projets |
@@ -138,12 +139,15 @@ SterPlatform/
 │   ├── Entity/            # User, Organization, OrganizationMember (Phase 1-2)
 │   ├── Repository/
 │   ├── Security/          # Voters, JWT authenticator
-│   ├── Controller/        # Auth endpoints (register, login, reset…)
+│   ├── Command/           # app:user:promote — attribuer ROLE_ADMIN
+│   ├── Controller/        # Auth, Organization, Mercure, Health endpoints
+│   ├── Controller/Admin/  # DashboardController, UserCrudController, OrganizationCrudController, SecurityController
 │   ├── Service/           # MercurePublisher, MailerService, TokenService
-│   ├── EventSubscriber/   # Doctrine listener → Mercure publish
+│   ├── EventSubscriber/   # TenantSubscriber, DoctrinePublishSubscriber, RequestMetricsSubscriber
 │   └── Extension/         # TenantFilter (Doctrine)
 ├── templates/
-│   └── emails/            # Twig email templates
+│   ├── emails/            # Twig email templates
+│   └── admin/             # login.html.twig (page login admin)
 ├── migrations/
 ├── tests/
 │   ├── Unit/
@@ -260,6 +264,8 @@ docker compose down -v
 | 19 | Mai 2026 | Phase 2 — Multi-tenancy | Entités `Organization` (id UUID, name, slug unique, createdAt) + `OrganizationMember` (user FK, organization FK, role enum OWNER/ADMIN/MEMBER, joinedAt). 5 endpoints : `POST/GET /api/organizations`, `GET /api/organizations/{slug}`, `POST/GET /api/organizations/{slug}/members`. `TenantContext` service + `TenantSubscriber` (kernel.request, priorité 5) lit le header `X-Organization-Slug`, active le filtre Doctrine `tenant_filter`. `TenantFilter` filtre les entités ayant une association `organization`. `OrganizationVoter` avec 3 attributs : `ORGANIZATION_VIEW` (tout membre), `ORGANIZATION_MANAGE_MEMBERS` (OWNER+ADMIN), `ORGANIZATION_OWNER`. Signature Voter Symfony 8 inclut `?Vote $vote = null`. |
 | 20 | Mai 2026 | Phase 3 — Mercure Real-time | `symfony/mercure-bundle` v0.4.2 installé. `config/packages/mercure.yaml` : hub `default` avec `url` (interne Docker `http://mercure/.well-known/mercure`) et `public_url` (browser `http://localhost:9090/.well-known/mercure`). `MercurePublisher` service : publie un `Update` Mercure sur les topics `orgs/{slug}` et `orgs/{slug}/{entityType}`. `DoctrinePublishSubscriber` : écoute `postPersist/postUpdate/postRemove` Doctrine, publie automatiquement pour toute entité ayant `getOrganization()` — échec silencieux si hub indisponible. `GET /api/mercure/token` : génère un JWT subscriber via `TokenFactoryInterface $defaultTokenFactory` (autowire Symfony Mercure v0.4), scopé aux topics des orgs de l'utilisateur. Correction `MERCURE_JWT_SECRET` : minimum 256 bits (32 chars) dans `.env`, `.env.test`, `docker-compose.yml`. 6 nouveaux tests (40/40 passants). |
 | 21 | Mai 2026 | Phase 3b — Élimination N+1 | `OrganizationMemberRepository` : 3 nouvelles méthodes avec JOIN FETCH. `findByUserWithOrganization(User)` → `OrganizationMember[]` avec org hydratée (remplace `list()` N+1). `findByOrganizationWithUser(Organization)` → `OrganizationMember[]` avec user hydraté (remplace `listMembers()` N+1). `findMembershipByOrgSlug(User, slug)` → membership + org en 1 requête JOIN (remplace `TenantSubscriber` 2-requêtes). `TenantSubscriber` simplifié : injection `OrganizationRepository` supprimée. `EXPLAIN ANALYZE` validé sur chaque requête critique : Index Scan slug, Bitmap Index user_id. Index existants confirmés suffisants (FK + unique constraint). 40/40 tests passants inchangés. |
+| 22 | Mai 2026 | CI/CD pipeline fusionné | Remplacement de `ci.yml` + `tests.yml` + `deploy.yml` par un seul `ci-cd.yml`. Job `deploy` dépend de `tests` (`needs: [tests]`) — aucun deploy sans CI verte. Deploy prod sur push `main` (`COOLIFY_WEBHOOK_URL`), staging sur push `develop` (`COOLIFY_STAGING_WEBHOOK_URL`). `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true` pour préparer la dépréciation Node 20 (juin 2026). Secrets GitHub configurés : `COOLIFY_TOKEN`, `COOLIFY_WEBHOOK_URL`, `COOLIFY_STAGING_WEBHOOK_URL`. Staging : `https://sterplatform.dev.bichetapps.com`, prod : `https://sterplatform.bichetapps.com`. |
+| 23 | Mai 2026 | Phase 4 — Admin EasyAdmin v5 + observabilité | `easycorp/easyadmin-bundle` v5.0.8 installé. `DashboardController` avec attribut `#[AdminDashboard]` (EasyAdmin v5 — `#[Route]` remplacé). `UserCrudController` (index/detail/edit/delete, create désactivé) + `OrganizationCrudController` (CRUD complet). `SecurityController` + `templates/admin/login.html.twig` : form_login session-based sur `/admin`, firewall `admin` séparé du firewall `api` JWT. `access_control` : `/admin/login` PUBLIC_ACCESS, `/admin` ROLE_ADMIN. `app:user:promote <email>` : attribue ROLE_ADMIN en base. `GET /health` : retourne `{"status":"ok/error","checks":{"database":"ok","mercure":"ok"}}` (HTTP 200 ou 503). `RequestMetricsSubscriber` : logue chaque requête en JSON structuré (method, path, status_code, duration_ms) — erreurs 5xx en `error`, 4xx en `warning`, reste en `info`. `symfony/monolog-bundle` v4 + `monolog.yaml` : logs JSON via `monolog.formatter.json` sur `php://stderr` en prod. |
 
 ---
 
@@ -271,6 +277,6 @@ docker compose down -v
 - [x] Phase 2 — Multi-tenancy (Organization, TenantFilter, OrganizationVoter — 34 tests)
 - [x] Phase 3 — Mercure Real-time (MercurePublisher, DoctrinePublishSubscriber, GET /api/mercure/token — 40 tests)
 - [x] Phase 3b — Refacto & Élimination N+1 (findByUserWithOrganization, findByOrganizationWithUser, findMembershipByOrgSlug — 40 tests)
-- [ ] Phase 4 — Admin & Observabilité (EasyAdmin 4, /health, logs structurés)
+- [x] Phase 4 — Admin & Observabilité (EasyAdmin v5, /admin CRUD, GET /health, RequestMetricsSubscriber, MonologBundle JSON)
 - [ ] Phase 5 — Migration DartsOpen (entités miroir Supabase, migration données, refactor frontend)
 - [ ] Phase 6 — Production multi-projets (guide intégration, versioning API, OpenAPI publique)

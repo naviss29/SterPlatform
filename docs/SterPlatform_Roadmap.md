@@ -1,9 +1,9 @@
 # SterPlatform — Roadmap & Plan technique
 
-> Version : 0.8 — Phase 3b terminée, N+1 éliminés
+> Version : 0.9 — Phase 4 terminée, CI/CD pipeline complet
 > Auteur : Alan
 > Date : Mai 2026
-> Statut : **Phase 3b terminée — Phase 4 (Admin & Observabilité) à démarrer**
+> Statut : **Phase 4 terminée — Phase 5 (Migration DartsOpen) à démarrer**
 
 ---
 
@@ -240,16 +240,17 @@ Chaque projet (DartsOpen, FestManager…) étend ce socle avec ses propres entit
 
 ---
 
-### Phase 4 — Admin & Observabilité *(1-2 sessions)*
+### Phase 4 — Admin & Observabilité ✅ *(terminée)*
 
 **Objectif :** Dashboard admin et monitoring.
 
-- [ ] EasyAdmin 4 — CRUD User, Organization
-- [ ] Health check endpoint `GET /health` (DB, Mercure)
-- [ ] Logs structurés (Monolog → JSON)
-- [ ] Métriques basiques (nb requêtes, erreurs 5xx)
+- [x] EasyAdmin v5 — CRUD User, Organization — `/admin` (ROLE_ADMIN) ✅
+- [x] `app:user:promote <email>` — commande console pour attribuer ROLE_ADMIN ✅
+- [x] Health check `GET /health` — vérifie DB + Mercure hub ✅
+- [x] Logs structurés JSON — MonologBundle + `monolog.formatter.json` sur `php://stderr` ✅
+- [x] Métriques basiques — `RequestMetricsSubscriber` (method/path/status/duration_ms par requête) ✅
 
-**Livrable :** Dashboard admin accessible en prod sur `/admin`.
+**Livrable :** Dashboard admin sur `/admin`, health check sur `/health`, métriques dans les logs Coolify. ✅
 
 ---
 
@@ -309,7 +310,7 @@ Chaque projet (DartsOpen, FestManager…) étend ce socle avec ses propres entit
 | Phase 2 — Multi-tenancy | ✅ 1 session | ~~🟠 Haute~~ |
 | Phase 3 — Mercure | ✅ 1 session | ~~🟠 Haute~~ |
 | Phase 3b — Refacto + N+1 | ✅ 1 session | ~~🟠 Haute~~ |
-| Phase 4 — Admin | 1-2 sessions | 🟡 Moyenne |
+| Phase 4 — Admin | ✅ 1 session | ~~🟡 Moyenne~~ |
 | Phase 5 — Migration DartsOpen | 4-5 sessions | 🟡 Moyenne (après Phase 3b) |
 | Phase 6 — Multi-projets | 1-2 sessions | 🟢 Basse |
 
@@ -362,11 +363,11 @@ SterPlatform/
 
 ---
 
-## 9. Prochaine session — Phase 4
+## 9. Prochaine session — Phase 5
 
 Actions concrètes pour démarrer :
 
-1. Installer `easyadmin/easyadmin-bundle` — CRUD User + Organization
-2. Créer `GET /health` — vérifie DB (doctrine ping) + Mercure hub (HTTP check)
-3. Configurer Monolog pour logs JSON structurés en prod (`formatter: json`)
-4. Ajouter métriques basiques : middleware comptage requêtes + erreurs 5xx via EventSubscriber
+1. Créer les entités Doctrine miroir du schéma Supabase DartsOpen (`Tournament`, `Round`, `Registration`, `Pool`, `Match`…)
+2. Générer les migrations Doctrine
+3. Écrire les scripts de migration des données existantes (Supabase → SterPlatform)
+4. Remplacer `@supabase/ssr` dans DartsOpen par des appels fetch vers `/api/auth/*`
