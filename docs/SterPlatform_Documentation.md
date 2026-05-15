@@ -204,8 +204,8 @@ docker compose run --rm php php bin/console lexik:jwt:generate-keypair --overwri
 docker compose run --rm php php bin/console doctrine:migrations:diff
 docker compose run --rm php php bin/console doctrine:migrations:migrate --no-interaction
 
-# Lancer les tests
-docker compose run --rm php php bin/phpunit
+# Lancer les tests (APP_ENV=test obligatoire)
+docker compose run --rm php sh -c "APP_ENV=test php bin/phpunit"
 
 # Arrêter et supprimer les volumes (reset complet)
 docker compose down -v
