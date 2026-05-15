@@ -85,14 +85,17 @@ class TournamentController extends AbstractController
         return $this->json($this->serializeTournament($tournament));
     }
 
-    // Public get (for live page / score page)
+    // Public get (for live page / score page / register page)
     #[Route('/public/tournaments/{id}', name: 'api_public_tournaments_get', methods: ['GET'])]
     public function getPublic(string $id): JsonResponse
     {
         $tournament = $this->tournamentRepo->findWithRounds($id);
         if (!$tournament) return $this->json(['error' => 'Tournoi introuvable.'], 404);
 
-        return $this->json($this->serializeTournament($tournament));
+        $data = $this->serializeTournament($tournament);
+        $data['registered_count'] = count($this->registrationRepo->findPaidByTournament($tournament));
+
+        return $this->json($data);
     }
 
     // ── Update ────────────────────────────────────────────────────────────────
@@ -303,20 +306,20 @@ class TournamentController extends AbstractController
     private function serializeTournamentSummary(Tournament $t): array
     {
         return [
-            'id'           => (string) $t->getId(),
-            'name'         => $t->getName(),
-            'date'         => $t->getDate()->format('Y-m-d'),
-            'location'     => $t->getLocation(),
-            'status'       => $t->getStatus()->value,
-            'maxPlayers'   => $t->getMaxPlayers(),
-            'entryFee'     => $t->getEntryFee(),
-            'nbPools'      => $t->getNbPools(),
-            'nbBoards'     => $t->getNbBoards(),
-            'playersPerTeam' => $t->getPlayersPerTeam(),
-            'advancementPerPool' => $t->getAdvancementPerPool(),
-            'registrationMode' => $t->getRegistrationMode()->value,
-            'scoringMode'  => $t->getScoringMode()->value,
-            'createdAt'    => $t->getCreatedAt()->format(\DateTimeInterface::ATOM),
+            'id'                   => (string) $t->getId(),
+            'name'                 => $t->getName(),
+            'date'                 => $t->getDate()->format('Y-m-d'),
+            'location'             => $t->getLocation(),
+            'status'               => $t->getStatus()->value,
+            'max_players'          => $t->getMaxPlayers(),
+            'entry_fee'            => $t->getEntryFee(),
+            'nb_pools'             => $t->getNbPools(),
+            'nb_boards'            => $t->getNbBoards(),
+            'players_per_team'     => $t->getPlayersPerTeam(),
+            'advancement_per_pool' => $t->getAdvancementPerPool(),
+            'registration_mode'    => $t->getRegistrationMode()->value,
+            'scoring_mode'         => $t->getScoringMode()->value,
+            'created_at'           => $t->getCreatedAt()->format(\DateTimeInterface::ATOM),
         ];
     }
 
@@ -340,16 +343,16 @@ class TournamentController extends AbstractController
     private function serializeRegistration(\App\Entity\Registration $r): array
     {
         return [
-            'id'                => (string) $r->getId(),
-            'playerName'        => $r->getPlayerName(),
-            'playerEmail'       => $r->getPlayerEmail(),
-            'playerPhone'       => $r->getPlayerPhone(),
-            'playerNames'       => $r->getPlayerNames(),
-            'status'            => $r->getStatus()->value,
-            'platformFeeCents'  => $r->getPlatformFeeCents(),
-            'feeCollected'      => $r->isFeeCollected(),
-            'qrCodeToken'       => $r->getQrCodeToken(),
-            'createdAt'         => $r->getCreatedAt()->format(\DateTimeInterface::ATOM),
+            'id'                 => (string) $r->getId(),
+            'player_name'        => $r->getPlayerName(),
+            'player_email'       => $r->getPlayerEmail(),
+            'player_phone'       => $r->getPlayerPhone(),
+            'player_names'       => $r->getPlayerNames(),
+            'status'             => $r->getStatus()->value,
+            'platform_fee_cents' => $r->getPlatformFeeCents(),
+            'fee_collected'      => $r->isFeeCollected(),
+            'qr_code_token'      => $r->getQrCodeToken(),
+            'created_at'         => $r->getCreatedAt()->format(\DateTimeInterface::ATOM),
         ];
     }
 

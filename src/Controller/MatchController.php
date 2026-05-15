@@ -176,26 +176,28 @@ class MatchController extends AbstractController
     {
         $sets = array_map(fn (MatchSet $s) => [
             'id'          => (string) $s->getId(),
-            'roundId'     => (string) $s->getRound()->getId(),
-            'roundOrder'  => $s->getRound()->getRoundOrder(),
+            'round_id'    => (string) $s->getRound()->getId(),
+            'round_order' => $s->getRound()->getRoundOrder(),
             'winner_id'   => $s->getWinner() ? (string) $s->getWinner()->getId() : null,
-            'validatedP1' => $s->isValidatedP1(),
-            'validatedP2' => $s->isValidatedP2(),
+            'validated_p1' => $s->isValidatedP1(),
+            'validated_p2' => $s->isValidatedP2(),
         ], $m->getSets()->toArray());
 
-        usort($sets, fn ($a, $b) => $a['roundOrder'] <=> $b['roundOrder']);
+        usort($sets, fn ($a, $b) => $a['round_order'] <=> $b['round_order']);
 
         return [
-            'id'              => (string) $m->getId(),
-            'status'          => $m->getStatus()->value,
-            'boardNumber'     => $m->getBoardNumber(),
-            'bracketRound'    => $m->getBracketRound(),
-            'bracketPosition' => $m->getBracketPosition(),
-            'pool_id'         => $m->getPool() ? (string) $m->getPool()->getId() : null,
-            'player1'         => ['id' => (string) $m->getPlayer1()->getId(), 'player_name' => $m->getPlayer1()->getPlayerName()],
-            'player2'         => ['id' => (string) $m->getPlayer2()->getId(), 'player_name' => $m->getPlayer2()->getPlayerName()],
-            'winner_id'       => $m->getWinner() ? (string) $m->getWinner()->getId() : null,
-            'sets'            => $sets,
+            'id'               => (string) $m->getId(),
+            'status'           => $m->getStatus()->value,
+            'board_number'     => $m->getBoardNumber(),
+            'bracket_round'    => $m->getBracketRound(),
+            'bracket_position' => $m->getBracketPosition(),
+            'pool_id'          => $m->getPool() ? (string) $m->getPool()->getId() : null,
+            'player1_id'       => (string) $m->getPlayer1()->getId(),
+            'player2_id'       => (string) $m->getPlayer2()->getId(),
+            'player1'          => ['id' => (string) $m->getPlayer1()->getId(), 'player_name' => $m->getPlayer1()->getPlayerName()],
+            'player2'          => ['id' => (string) $m->getPlayer2()->getId(), 'player_name' => $m->getPlayer2()->getPlayerName()],
+            'winner_id'        => $m->getWinner() ? (string) $m->getWinner()->getId() : null,
+            'sets'             => $sets,
         ];
     }
 }

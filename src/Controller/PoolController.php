@@ -179,18 +179,21 @@ class PoolController extends AbstractController
 
         return array_map(function (Pool $pool) {
             $players = array_map(fn (PoolPlayer $pp) => [
-                'id'         => (string) $pp->getRegistration()->getId(),
-                'playerName' => $pp->getRegistration()->getPlayerName(),
+                'id'          => (string) $pp->getRegistration()->getId(),
+                'player_name' => $pp->getRegistration()->getPlayerName(),
             ], $pool->getPlayers()->toArray());
 
             $matches = $this->matchRepo->findBy(['pool' => $pool], ['boardNumber' => 'ASC']);
             $matchesData = array_map(fn (DartsMatch $m) => [
-                'id'          => (string) $m->getId(),
-                'status'      => $m->getStatus()->value,
-                'boardNumber' => $m->getBoardNumber(),
-                'player1'     => ['id' => (string) $m->getPlayer1()->getId(), 'player_name' => $m->getPlayer1()->getPlayerName()],
-                'player2'     => ['id' => (string) $m->getPlayer2()->getId(), 'player_name' => $m->getPlayer2()->getPlayerName()],
-                'winner_id'   => $m->getWinner() ? (string) $m->getWinner()->getId() : null,
+                'id'           => (string) $m->getId(),
+                'status'       => $m->getStatus()->value,
+                'board_number' => $m->getBoardNumber(),
+                'player1_id'   => (string) $m->getPlayer1()->getId(),
+                'player2_id'   => (string) $m->getPlayer2()->getId(),
+                'player1'      => ['id' => (string) $m->getPlayer1()->getId(), 'player_name' => $m->getPlayer1()->getPlayerName()],
+                'player2'      => ['id' => (string) $m->getPlayer2()->getId(), 'player_name' => $m->getPlayer2()->getPlayerName()],
+                'winner_id'    => $m->getWinner() ? (string) $m->getWinner()->getId() : null,
+                'pool_id'      => (string) $pool->getId(),
             ], $matches);
 
             return [
