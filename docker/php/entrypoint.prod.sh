@@ -9,6 +9,9 @@ fi
 # Vider le cache Symfony
 php bin/console cache:clear --env=prod --no-debug
 
+# Installer les assets des bundles (EasyAdmin, etc.)
+php bin/console assets:install --env=prod --no-debug
+
 # Exécuter les migrations en attente
 php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
 
