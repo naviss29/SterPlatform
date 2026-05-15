@@ -205,6 +205,15 @@ class AuthControllerTest extends WebTestCase
         $this->assertStringContainsString('expiré', $data['error']);
     }
 
+    public function testVerifyWithRedirectUri(): void
+    {
+        $this->createUnverifiedUser('redirect@example.com');
+
+        $this->client->request('GET', '/api/auth/verify?token=valid_verification_token_abc123&redirect_uri=https://dartsopen.example.com/auth/verified');
+
+        $this->assertResponseRedirects('https://dartsopen.example.com/auth/verified');
+    }
+
     // ------------------------------------------------------------------ forgot-password
 
     public function testForgotPasswordSuccess(): void

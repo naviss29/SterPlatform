@@ -16,9 +16,12 @@ class MailerService
         private readonly string $fromEmail,
     ) {}
 
-    public function sendVerificationEmail(User $user): void
+    public function sendVerificationEmail(User $user, ?string $redirectUri = null): void
     {
         $link = sprintf('%s/api/auth/verify?token=%s', $this->appUrl, $user->getVerificationToken());
+        if ($redirectUri) {
+            $link .= '&redirect_uri=' . urlencode($redirectUri);
+        }
 
         $html = $this->twig->render('emails/verification.html.twig', [
             'user' => $user,
@@ -34,9 +37,10 @@ class MailerService
         $this->mailer->send($email);
     }
 
-    public function sendPasswordResetEmail(User $user): void
+    public function sendPasswordResetEmail(User $user, ?string $resetBaseUrl = null): void
     {
-        $link = sprintf('%s/reset-password?token=%s', $this->appUrl, $user->getResetToken());
+        $base = rtrim($resetBaseUrl ?? $this->appUrl, '/');
+        $link = sprintf('%s/reset-password?token=%s', $base, $user->getResetToken());
 
         $html = $this->twig->render('emails/reset_password.html.twig', [
             'user' => $user,

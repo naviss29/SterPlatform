@@ -9,6 +9,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Gesdinet\JWTRefreshTokenBundle\Model\RefreshTokenManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
@@ -67,16 +68,18 @@ class AuthController extends AbstractController
         $user->setVerificationToken($token);
         $user->setVerificationTokenExpiresAt(new \DateTimeImmutable('+24 hours'));
 
+        $verifyRedirectUri = (string) ($data['verifyRedirectUri'] ?? '');
+
         $this->em->persist($user);
         $this->em->flush();
 
-        $this->mailerService->sendVerificationEmail($user);
+        $this->mailerService->sendVerificationEmail($user, $verifyRedirectUri ?: null);
 
         return $this->json(['message' => 'Si cet email est valide, un lien de confirmation vous a été envoyé.'], 201);
     }
 
     #[Route('/verify', name: 'api_auth_verify', methods: ['GET'])]
-    public function verify(Request $request): JsonResponse
+    public function verify(Request $request): JsonResponse|RedirectResponse
     {
         $token = $request->query->getString('token');
 
@@ -100,6 +103,11 @@ class AuthController extends AbstractController
 
         $this->em->flush();
 
+        $redirectUri = $request->query->getString('redirect_uri');
+        if ($redirectUri) {
+            return new RedirectResponse($redirectUri);
+        }
+
         return $this->json(['message' => 'Compte activé avec succès. Vous pouvez maintenant vous connecter.']);
     }
 
@@ -122,12 +130,14 @@ class AuthController extends AbstractController
             return $genericResponse;
         }
 
+        $resetRedirectBaseUrl = (string) ($data['resetRedirectBaseUrl'] ?? '');
+
         $token = bin2hex(random_bytes(32));
         $user->setResetToken($token);
         $user->setResetTokenExpiresAt(new \DateTimeImmutable('+1 hour'));
         $this->em->flush();
 
-        $this->mailerService->sendPasswordResetEmail($user);
+        $this->mailerService->sendPasswordResetEmail($user, $resetRedirectBaseUrl ?: null);
 
         return $genericResponse;
     }
