@@ -1,9 +1,9 @@
 # SterPlatform — Documentation technique
 
-> Version : 0.5
+> Version : 0.7
 > Auteur : Alan
 > Date : Mai 2026
-> Statut : **Phase 2 terminée — Multi-tenancy opérationnel**
+> Statut : **Phase 3b terminée — N+1 éliminés, base prête pour Phase 4**
 
 ---
 
@@ -16,6 +16,8 @@
 | 0.3 | Mai 2026 | Upgrade PostgreSQL 16 → 18 (tous les environnements), correction du point de montage volume PG18 (`/var/lib/postgresql` au lieu de `/var/lib/postgresql/data`), Dockerfile production multi-stage (PHP-FPM + Nginx + Supervisor), CI GitHub Actions, deploy webhook Coolify |
 | 0.4 | Mai 2026 | Phase 1b — JWT refresh token (`POST /api/auth/refresh`), logout avec révocation (`POST /api/auth/logout`), entité `RefreshToken` + migration, CI GitHub Actions opérationnel (tests + lint sur `develop` + `main`), 23 tests PHPUnit passants |
 | 0.5 | Mai 2026 | Phase 2 — Multi-tenancy : entités `Organization` + `OrganizationMember`, 5 endpoints REST, `TenantFilter` Doctrine (header `X-Organization-Slug`), `OrganizationVoter` (OWNER/ADMIN/MEMBER), 34/34 tests passants |
+| 0.6 | Mai 2026 | Phase 3 — Mercure Real-time : `symfony/mercure-bundle` v0.4.2, `MercurePublisher`, `DoctrinePublishSubscriber`, `GET /api/mercure/token`, fix `MERCURE_JWT_SECRET` (256 bits min), 40/40 tests passants |
+| 0.7 | Mai 2026 | Phase 3b — Élimination N+1 : `findByUserWithOrganization`, `findByOrganizationWithUser`, `findMembershipByOrgSlug`, `TenantSubscriber` simplifié (OrganizationRepository supprimé), EXPLAIN validé, 40/40 tests passants |
 
 ---
 
@@ -225,6 +227,9 @@ docker compose down -v
 | 11 | `access_control` — `/api/auth/me` public par héritage de règle | La règle `{ path: ^/api/auth, roles: PUBLIC_ACCESS }` couvre `/api/auth/me`. Un appel sans token atteint le contrôleur avec `getUser() === null` → crash 500 au lieu de 401. | Ajouter une règle plus spécifique **avant** la règle générale : `{ path: ^/api/auth/me$, roles: IS_AUTHENTICATED_FULLY }`. Dans `access_control`, la première règle qui matche gagne. |
 | 12 | Docker — PostgreSQL 18 — container crash au démarrage | Après upgrade PG16 → PG18, le container `db` crashe avec : `"there appears to be PostgreSQL data in /var/lib/postgresql/data (unused mount/volume)"`. PG18 change la structure interne : les données sont désormais stockées dans un sous-répertoire versionné (ex. `/var/lib/postgresql/18/main`) au lieu de `/var/lib/postgresql/data` directement. | Changer le point de montage du volume dans `docker-compose.yml` (et `.prod.yml`) : **`- db_data:/var/lib/postgresql`** (sans `/data`). Puis `docker compose down -v` + `docker compose up -d` pour recréer le volume avec la bonne structure. |
 | 13 | CI GitHub Actions — `serverVersion` incohérent avec image PG | Le `DATABASE_URL` en CI pointait vers `serverVersion=16` alors que l'image PostgreSQL était déjà `postgres:18-alpine` → Doctrine générait des requêtes avec hints PG16, potentiellement incompatibles avec PG18. | Mettre à jour simultanément l'image (`postgres:18-alpine`) et le `serverVersion` dans `DATABASE_URL` (`serverVersion=18`) dans `ci.yml`. Les deux doivent toujours être synchronisés. |
+| 14 | Mercure — `MERCURE_JWT_SECRET` trop court / non résolu en CI | `lcobucci/jwt` exige un secret HMAC-SHA256 d'au moins **256 bits (32 caractères)**. En CI, le bundle Mercure ne résout pas fiablement `%env(MERCURE_JWT_SECRET)%` depuis les env vars du workflow — il utilise une valeur résiduelle courte. | **Solution correcte** : surcharger le secret directement dans `config/packages/mercure.yaml` via `when@test:` avec une valeur hardcodée ≥ 32 chars. Même pattern que `dbname_suffix` dans `doctrine.yaml`. Ne jamais dépendre d'une env var pour le secret Mercure en test. |
+| 15 | CI — `DATABASE_URL` sans `serverVersion` → `Invalid platform version ""` | Passer `DATABASE_URL=postgresql://...@127.0.0.1:5432/sterplatform_test` sans `?serverVersion=18` fait que Doctrine reçoit une version vide et refuse de démarrer : `Invalid platform version "" specified`. | Toujours inclure `?serverVersion=18&charset=utf8` dans le `DATABASE_URL` du workflow CI. |
+| 16 | CI — double suffixe `_test` sur le nom de la base | `doctrine.yaml` (bloc `when@test`) configure `dbname_suffix: '_test'` qui ajoute automatiquement `_test` au nom de la base. En passant `DATABASE_URL=...sterplatform_test` en CI, Doctrine cherche `sterplatform_test_test`. | Passer `sterplatform` (sans `_test`) dans `DATABASE_URL` en CI et dans `.env.test`. Le `dbname_suffix` construit automatiquement `sterplatform_test`. Le service PostgreSQL en CI doit créer `POSTGRES_DB: sterplatform_test`. |
 
 ---
 
@@ -253,6 +258,8 @@ docker compose down -v
 | 17 | Mai 2026 | Phase 1b — JWT Refresh Token + Logout | Installation `gesdinet/jwt-refresh-token-bundle` v2.0.0. Entité `RefreshToken` étend le `mapped-superclass` du bundle, table `refresh_tokens`. `POST /api/auth/refresh` géré par le firewall `refresh_jwt` (stub route nécessaire). `POST /api/auth/logout` révoque le refresh token via `RefreshTokenManagerInterface` (JWT requis). Login retourne désormais `token` + `refresh_token`. 6 tests ajoutés (23/23 passants). Bundle enregistré manuellement dans `bundles.php` (recipe Flex ignorée). |
 | 18 | Mai 2026 | CI GitHub Actions — workflow tests.yml | `.github/workflows/tests.yml` : déclenché sur push/PR vers `develop` et `main`. Service `postgres:18-alpine`, PHP 8.4 + extensions, cache Composer, génération JWT keypair, migration test, phpunit. `DATABASE_URL` injecté via env dans le workflow (pas de secrets requis pour les tests). |
 | 19 | Mai 2026 | Phase 2 — Multi-tenancy | Entités `Organization` (id UUID, name, slug unique, createdAt) + `OrganizationMember` (user FK, organization FK, role enum OWNER/ADMIN/MEMBER, joinedAt). 5 endpoints : `POST/GET /api/organizations`, `GET /api/organizations/{slug}`, `POST/GET /api/organizations/{slug}/members`. `TenantContext` service + `TenantSubscriber` (kernel.request, priorité 5) lit le header `X-Organization-Slug`, active le filtre Doctrine `tenant_filter`. `TenantFilter` filtre les entités ayant une association `organization`. `OrganizationVoter` avec 3 attributs : `ORGANIZATION_VIEW` (tout membre), `ORGANIZATION_MANAGE_MEMBERS` (OWNER+ADMIN), `ORGANIZATION_OWNER`. Signature Voter Symfony 8 inclut `?Vote $vote = null`. |
+| 20 | Mai 2026 | Phase 3 — Mercure Real-time | `symfony/mercure-bundle` v0.4.2 installé. `config/packages/mercure.yaml` : hub `default` avec `url` (interne Docker `http://mercure/.well-known/mercure`) et `public_url` (browser `http://localhost:9090/.well-known/mercure`). `MercurePublisher` service : publie un `Update` Mercure sur les topics `orgs/{slug}` et `orgs/{slug}/{entityType}`. `DoctrinePublishSubscriber` : écoute `postPersist/postUpdate/postRemove` Doctrine, publie automatiquement pour toute entité ayant `getOrganization()` — échec silencieux si hub indisponible. `GET /api/mercure/token` : génère un JWT subscriber via `TokenFactoryInterface $defaultTokenFactory` (autowire Symfony Mercure v0.4), scopé aux topics des orgs de l'utilisateur. Correction `MERCURE_JWT_SECRET` : minimum 256 bits (32 chars) dans `.env`, `.env.test`, `docker-compose.yml`. 6 nouveaux tests (40/40 passants). |
+| 21 | Mai 2026 | Phase 3b — Élimination N+1 | `OrganizationMemberRepository` : 3 nouvelles méthodes avec JOIN FETCH. `findByUserWithOrganization(User)` → `OrganizationMember[]` avec org hydratée (remplace `list()` N+1). `findByOrganizationWithUser(Organization)` → `OrganizationMember[]` avec user hydraté (remplace `listMembers()` N+1). `findMembershipByOrgSlug(User, slug)` → membership + org en 1 requête JOIN (remplace `TenantSubscriber` 2-requêtes). `TenantSubscriber` simplifié : injection `OrganizationRepository` supprimée. `EXPLAIN ANALYZE` validé sur chaque requête critique : Index Scan slug, Bitmap Index user_id. Index existants confirmés suffisants (FK + unique constraint). 40/40 tests passants inchangés. |
 
 ---
 
@@ -262,8 +269,8 @@ docker compose down -v
 - [x] Phase 1 — Auth générique (User entity, register, verify, login, forgot-password, reset-password, me — 17 tests)
 - [x] Phase 1b — JWT refresh token + logout + CI GitHub Actions (23 tests)
 - [x] Phase 2 — Multi-tenancy (Organization, TenantFilter, OrganizationVoter — 34 tests)
-- [ ] Phase 3 — Mercure Real-time
-- [ ] Phase 3 — Mercure Real-time (MercurePublisher, EventSubscriber, exemples Next.js + Angular)
+- [x] Phase 3 — Mercure Real-time (MercurePublisher, DoctrinePublishSubscriber, GET /api/mercure/token — 40 tests)
+- [x] Phase 3b — Refacto & Élimination N+1 (findByUserWithOrganization, findByOrganizationWithUser, findMembershipByOrgSlug — 40 tests)
 - [ ] Phase 4 — Admin & Observabilité (EasyAdmin 4, /health, logs structurés)
 - [ ] Phase 5 — Migration DartsOpen (entités miroir Supabase, migration données, refactor frontend)
 - [ ] Phase 6 — Production multi-projets (guide intégration, versioning API, OpenAPI publique)

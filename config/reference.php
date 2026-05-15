@@ -465,7 +465,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *     },
  *     disallow_search_engine_index?: bool|Param, // Enabled by default when debug is enabled. // Default: true
  *     http_client?: bool|array{ // HTTP Client configuration
- *         enabled?: bool|Param, // Default: false
+ *         enabled?: bool|Param, // Default: true
  *         max_host_connections?: int|Param, // The maximum number of connections to a single host.
  *         default_options?: array{
  *             headers?: array<string, mixed>,
@@ -806,7 +806,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         },
  *     },
  *     mercure?: bool|array{
- *         enabled?: bool|Param, // Default: false
+ *         enabled?: bool|Param, // Default: true
  *         hub_url?: scalar|Param|null, // The URL sent in the Link HTTP header. If not set, will default to the URL for MercureBundle's default hub. // Default: null
  *         include_type?: bool|Param, // Always include @type in updates (including delete ones). // Default: false
  *     },
@@ -1278,6 +1278,13 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *             always_remember_me?: bool|Param, // Default: false
  *             remember_me_parameter?: scalar|Param|null, // Default: "_remember_me"
  *         },
+ *         refresh_jwt?: array{
+ *             check_path?: scalar|Param|null, // Default: "/login_check"
+ *             provider?: scalar|Param|null,
+ *             success_handler?: scalar|Param|null,
+ *             failure_handler?: scalar|Param|null,
+ *             invalidate_token_on_logout?: bool|Param, // When enabled, the refresh token will be invalided on logout. // Default: true
+ *         },
  *     }>,
  *     access_control?: list<array{ // Default: []
  *         request_matcher?: scalar|Param|null, // Default: null
@@ -1666,6 +1673,49 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         ...<string, mixed>
  *     },
  * }
+ * @psalm-type GesdinetJwtRefreshTokenConfig = array{
+ *     ttl?: int|Param, // The default TTL for all authenticators. // Default: 2592000
+ *     ttl_update?: bool|Param, // The default update TTL flag for all authenticators. // Default: false
+ *     manager_type?: scalar|Param|null, // Set the type of object manager to use (default: orm) // Default: "orm"
+ *     refresh_token_class?: scalar|Param|null, // Set the refresh token class to use
+ *     object_manager?: scalar|Param|null, // Set the object manager to use (default: doctrine.orm.entity_manager) // Default: null
+ *     single_use?: scalar|Param|null, // When true, generate a new refresh token on consumption (deleting the old one) // Default: false
+ *     token_parameter_name?: scalar|Param|null, // The default request parameter name containing the refresh token for all authenticators. // Default: "refresh_token"
+ *     cookie?: bool|array{
+ *         enabled?: bool|Param, // Default: false
+ *         same_site?: "none"|"lax"|"strict"|Param, // Default: "lax"
+ *         path?: scalar|Param|null, // Default: "/"
+ *         domain?: scalar|Param|null, // Default: null
+ *         http_only?: scalar|Param|null, // Default: true
+ *         secure?: scalar|Param|null, // Default: true
+ *         partitioned?: scalar|Param|null, // Default: false
+ *         remove_token_from_body?: scalar|Param|null, // Default: true
+ *     },
+ *     return_expiration?: scalar|Param|null, // When true, the response will include the token expiration timestamp // Default: false
+ *     return_expiration_parameter_name?: scalar|Param|null, // The default response parameter name containing the refresh token expiration timestamp // Default: "refresh_token_expiration"
+ *     default_invalid_batch_size?: int|Param, // The default batch size when clearing invalid tokens // Default: 1000
+ * }
+ * @psalm-type MercureConfig = array{
+ *     hubs?: array<string, array{ // Default: []
+ *         url?: scalar|Param|null, // URL of the hub's publish endpoint
+ *         public_url?: scalar|Param|null, // URL of the hub's public endpoint // Default: null
+ *         jwt?: string|array{ // JSON Web Token configuration.
+ *             value?: scalar|Param|null, // JSON Web Token to use to publish to this hub.
+ *             provider?: scalar|Param|null, // The ID of a service to call to provide the JSON Web Token.
+ *             factory?: scalar|Param|null, // The ID of a service to call to create the JSON Web Token.
+ *             publish?: list<scalar|Param|null>,
+ *             subscribe?: list<scalar|Param|null>,
+ *             secret?: scalar|Param|null, // The JWT Secret to use.
+ *             passphrase?: scalar|Param|null, // The JWT secret passphrase. // Default: ""
+ *             algorithm?: scalar|Param|null, // The algorithm to use to sign the JWT // Default: "hmac.sha256"
+ *         },
+ *         jwt_provider?: scalar|Param|null, // Deprecated: The child node "jwt_provider" at path "mercure.hubs..jwt_provider" is deprecated, use "jwt.provider" instead. // The ID of a service to call to generate the JSON Web Token.
+ *         bus?: scalar|Param|null, // Name of the Messenger bus where the handler for this hub must be registered. Default to the default bus if Messenger is enabled.
+ *     }>,
+ *     default_hub?: scalar|Param|null,
+ *     default_cookie_lifetime?: int|Param, // Default lifetime of the cookie containing the JWT, in seconds. Defaults to the value of "framework.session.cookie_lifetime". // Default: null
+ *     enable_profiler?: bool|Param, // Deprecated: The child node "enable_profiler" at path "mercure.enable_profiler" is deprecated. // Enable Symfony Web Profiler integration.
+ * }
  * @psalm-type ConfigType = array{
  *     imports?: ImportsConfig,
  *     parameters?: ParametersConfig,
@@ -1678,19 +1728,8 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *     doctrine_migrations?: DoctrineMigrationsConfig,
  *     twig?: TwigConfig,
  *     twig_extra?: TwigExtraConfig,
- *     "when@dev"?: array{
- *         imports?: ImportsConfig,
- *         parameters?: ParametersConfig,
- *         services?: ServicesConfig,
- *         framework?: FrameworkConfig,
- *         api_platform?: ApiPlatformConfig,
- *         security?: SecurityConfig,
- *         lexik_jwt_authentication?: LexikJwtAuthenticationConfig,
- *         doctrine?: DoctrineConfig,
- *         doctrine_migrations?: DoctrineMigrationsConfig,
- *         twig?: TwigConfig,
- *         twig_extra?: TwigExtraConfig,
- *     },
+ *     gesdinet_jwt_refresh_token?: GesdinetJwtRefreshTokenConfig,
+ *     mercure?: MercureConfig,
  *     "when@prod"?: array{
  *         imports?: ImportsConfig,
  *         parameters?: ParametersConfig,
@@ -1703,6 +1742,8 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         doctrine_migrations?: DoctrineMigrationsConfig,
  *         twig?: TwigConfig,
  *         twig_extra?: TwigExtraConfig,
+ *         gesdinet_jwt_refresh_token?: GesdinetJwtRefreshTokenConfig,
+ *         mercure?: MercureConfig,
  *     },
  *     "when@test"?: array{
  *         imports?: ImportsConfig,
@@ -1716,6 +1757,8 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         doctrine_migrations?: DoctrineMigrationsConfig,
  *         twig?: TwigConfig,
  *         twig_extra?: TwigExtraConfig,
+ *         gesdinet_jwt_refresh_token?: GesdinetJwtRefreshTokenConfig,
+ *         mercure?: MercureConfig,
  *     },
  *     ...<string, ExtensionType|array{ // extra keys must follow the when@%env% pattern or match an extension alias
  *         imports?: ImportsConfig,
@@ -1799,7 +1842,6 @@ namespace Symfony\Component\Routing\Loader\Configurator;
  *     deprecated?: array{package:string, version:string, message?:string},
  * }
  * @psalm-type RoutesConfig = array{
- *     "when@dev"?: array<string, RouteConfig|ImportConfig|AliasConfig>,
  *     "when@prod"?: array<string, RouteConfig|ImportConfig|AliasConfig>,
  *     "when@test"?: array<string, RouteConfig|ImportConfig|AliasConfig>,
  *     ...<string, RouteConfig|ImportConfig|AliasConfig>

@@ -1,9 +1,9 @@
 # SterPlatform — Roadmap & Plan technique
 
-> Version : 0.6 — Phase 2 terminée, multi-tenancy opérationnel
+> Version : 0.8 — Phase 3b terminée, N+1 éliminés
 > Auteur : Alan
 > Date : Mai 2026
-> Statut : **Phase 2 terminée — Phase 3 (Mercure) à démarrer**
+> Statut : **Phase 3b terminée — Phase 4 (Admin & Observabilité) à démarrer**
 
 ---
 
@@ -201,19 +201,42 @@ Chaque projet (DartsOpen, FestManager…) étend ce socle avec ses propres entit
 
 ---
 
-### Phase 3 — Mercure Real-time *(2 sessions)*
+### Phase 3 — Mercure Real-time ✅ *(terminée)*
 
 **Objectif :** Remplacer Supabase Realtime par un hub Mercure intégré.
 
-- [ ] Mercure hub dans Docker Compose
-- [ ] `MercurePublisher` service générique (publie sur un topic)
-- [ ] Docrtine EventSubscriber : publication automatique à chaque `POST/PUT/DELETE`
-- [ ] JWT Mercure côté client (token endpoint)
-- [ ] Exemple côté Next.js : `EventSource` abonné à un topic
-- [ ] Exemple côté Angular : idem avec `EventSourcePolyfill`
-- [ ] Tests : publication → réception en temps réel
+- [x] `symfony/mercure-bundle` v0.4.2 installé + `config/packages/mercure.yaml` configuré
+- [x] Mercure hub dans Docker Compose (service `mercure`, port `9090`) ✅
+- [x] `MERCURE_HUB_INTERNAL_URL` + `MERCURE_HUB_PUBLIC_URL` dans `.env` ✅
+- [x] `MercurePublisher` service — publie sur `orgs/{slug}` et `orgs/{slug}/{entityType}` ✅
+- [x] `DoctrinePublishSubscriber` — publication automatique sur `postPersist/postUpdate/postRemove` pour toute entité avec `getOrganization()` ✅
+- [x] `GET /api/mercure/token` — retourne un JWT Mercure subscriber scopé aux orgs de l'utilisateur ✅
+- [x] Tests : 6 nouveaux tests (token 401, token JWT valide, topics corrects, user sans org) — 40/40 passants ✅
+- [x] `MERCURE_JWT_SECRET` corrigé (min 256 bits) dans `.env`, `.env.test`, `docker-compose.yml` ✅
 
-**Livrable :** Un changement en base déclenche une mise à jour temps réel sur tous les clients abonnés.
+**Livrable :** Un changement en base sur une entité liée à une org déclenche une mise à jour temps réel. Le client obtient un JWT Mercure via `GET /api/mercure/token` et s'abonne via `EventSource`. ✅
+
+---
+
+### Phase 3b — Refacto & Élimination N+1 ✅ *(terminée)*
+
+**Objectif :** Assainir les requêtes, éliminer les problèmes N+1, et améliorer la lisibilité du code.
+
+- [x] Audit N+1 : `list()` (N×`findMembership`) + `listMembers()` (N×lazy `getUser()`) + `TenantSubscriber` (2 requêtes séquentielles) ✅
+- [x] `OrganizationMemberRepository::findByUserWithOrganization()` — JOIN FETCH org, remplace `findByUser + N×findMembership` dans `list()` ✅
+- [x] `OrganizationMemberRepository::findByOrganizationWithUser()` — JOIN FETCH user, remplace `$org->getMembers() + N×getUser()` dans `listMembers()` ✅
+- [x] `OrganizationMemberRepository::findMembershipByOrgSlug()` — JOIN org+membership en 1 requête, remplace `findBySlug + hasRole` dans `TenantSubscriber` ✅
+- [x] `TenantSubscriber` simplifié — injection `OrganizationRepository` supprimée ✅
+- [x] Index confirmés : `slug` unique, FK `user_id` + `organization_id`, unique constraint `(user_id, organization_id)` — tout couvert ✅
+- [x] `EXPLAIN ANALYZE` validé : Index Scan sur slug + Bitmap Index sur user_id — aucun Seq Scan sur les tables critiques ✅
+- [x] 40/40 tests passants après refacto ✅
+
+**Résultat :**
+| Endpoint | Avant | Après |
+|---|---|---|
+| `GET /api/organizations` | 1 + N requêtes | **1 requête** (JOIN FETCH) |
+| `GET /api/organizations/{slug}/members` | 1 + N requêtes | **1 requête** (JOIN FETCH) |
+| `X-Organization-Slug` header (par request) | 2 requêtes | **1 requête** (JOIN combiné) |
 
 ---
 
@@ -284,12 +307,13 @@ Chaque projet (DartsOpen, FestManager…) étend ce socle avec ses propres entit
 | Phase 1 — Auth | ✅ 1 session | ~~🔴 Critique~~ |
 | Phase 1b — JWT Refresh | ✅ 1 session | ~~🔴 Critique~~ |
 | Phase 2 — Multi-tenancy | ✅ 1 session | ~~🟠 Haute~~ |
-| Phase 3 — Mercure | 2 sessions | 🟠 Haute |
+| Phase 3 — Mercure | ✅ 1 session | ~~🟠 Haute~~ |
+| Phase 3b — Refacto + N+1 | ✅ 1 session | ~~🟠 Haute~~ |
 | Phase 4 — Admin | 1-2 sessions | 🟡 Moyenne |
-| Phase 5 — Migration DartsOpen | 4-5 sessions | 🟡 Moyenne (après Phase 3) |
+| Phase 5 — Migration DartsOpen | 4-5 sessions | 🟡 Moyenne (après Phase 3b) |
 | Phase 6 — Multi-projets | 1-2 sessions | 🟢 Basse |
 
-**Total estimé : 15-21 sessions**
+**Total estimé : 15-22 sessions**
 
 ---
 
@@ -338,13 +362,11 @@ SterPlatform/
 
 ---
 
-## 9. Prochaine session — Phase 3
+## 9. Prochaine session — Phase 4
 
 Actions concrètes pour démarrer :
 
-1. Vérifier que le hub Mercure est bien configuré dans `docker-compose.yml`
-2. Créer `MercurePublisher` service (publie sur un topic avec JWT signé)
-3. Créer `DoctrineEventSubscriber` — publication automatique à chaque flush Doctrine
-4. Endpoint `GET /api/mercure/token` — retourne un JWT Mercure pour le client
-5. Exemple côté Next.js : `EventSource` abonné à un topic organisationnel
-6. Tests : publication → réception en temps réel
+1. Installer `easyadmin/easyadmin-bundle` — CRUD User + Organization
+2. Créer `GET /health` — vérifie DB (doctrine ping) + Mercure hub (HTTP check)
+3. Configurer Monolog pour logs JSON structurés en prod (`formatter: json`)
+4. Ajouter métriques basiques : middleware comptage requêtes + erreurs 5xx via EventSubscriber

@@ -1,0 +1,16 @@
+mercure:
+    hubs:
+        default:
+            url: '%env(MERCURE_HUB_INTERNAL_URL)%'
+            public_url: '%env(MERCURE_HUB_PUBLIC_URL)%'
+            jwt:
+                secret: '%env(MERCURE_JWT_SECRET)%'
+                publish: '*'
+                subscribe: []
+
+when@test:
+    mercure:
+        hubs:
+            default:
+                jwt:
+                    secret: 'sterplatform_mercure_test_secret_key_ok'

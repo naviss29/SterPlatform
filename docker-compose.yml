@@ -44,8 +44,10 @@ services:
     image: dunglas/mercure
     environment:
       SERVER_NAME: ':80'
-      MERCURE_PUBLISHER_JWT_KEY: '${MERCURE_JWT_SECRET:-sterplatform_mercure_secret}'
-      MERCURE_SUBSCRIBER_JWT_KEY: '${MERCURE_JWT_SECRET:-sterplatform_mercure_secret}'
+      MERCURE_PUBLISHER_JWT_KEY: '${MERCURE_JWT_SECRET:-sterplatform_mercure_secret_key_32ch}'
+      MERCURE_SUBSCRIBER_JWT_KEY: '${MERCURE_JWT_SECRET:-sterplatform_mercure_secret_key_32ch}'
+      MERCURE_EXTRA_DIRECTIVES: |
+        cors_origins http://localhost:8080
     ports:
       - "9090:80"
     command: /usr/bin/caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
