@@ -27,19 +27,16 @@ class HealthController extends AbstractController
             $status = 'error';
         }
 
-        // Mercure check
+        // Mercure check (non-bloquant — warning uniquement)
         $mercureUrl = $_ENV['MERCURE_HUB_INTERNAL_URL'] ?? null;
         if ($mercureUrl) {
             try {
                 $hubBase = preg_replace('#/\.well-known/mercure$#', '', $mercureUrl);
                 $ctx = stream_context_create(['http' => ['timeout' => 2, 'ignore_errors' => true]]);
                 $result = @file_get_contents($hubBase, false, $ctx);
-                $checks['mercure'] = ($result !== false) ? 'ok' : 'error';
+                $checks['mercure'] = ($result !== false) ? 'ok' : 'unreachable';
             } catch (\Throwable) {
-                $checks['mercure'] = 'error';
-            }
-            if ($checks['mercure'] === 'error') {
-                $status = 'error';
+                $checks['mercure'] = 'unreachable';
             }
         } else {
             $checks['mercure'] = 'unconfigured';
