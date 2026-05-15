@@ -1,9 +1,9 @@
 # SterPlatform — Documentation technique
 
-> Version : 0.8
+> Version : 0.9
 > Auteur : Alan
 > Date : Mai 2026
-> Statut : **Phase 4 terminée — Admin EasyAdmin, /health, métriques, CI/CD pipeline complet**
+> Statut : **Production opérationnelle — https://sterplatform.bichetapps.com — Phase 5 (Migration DartsOpen) à démarrer**
 
 ---
 
@@ -19,6 +19,7 @@
 | 0.6 | Mai 2026 | Phase 3 — Mercure Real-time : `symfony/mercure-bundle` v0.4.2, `MercurePublisher`, `DoctrinePublishSubscriber`, `GET /api/mercure/token`, fix `MERCURE_JWT_SECRET` (256 bits min), 40/40 tests passants |
 | 0.7 | Mai 2026 | Phase 3b — Élimination N+1 : `findByUserWithOrganization`, `findByOrganizationWithUser`, `findMembershipByOrgSlug`, `TenantSubscriber` simplifié (OrganizationRepository supprimé), EXPLAIN validé, 40/40 tests passants |
 | 0.8 | Mai 2026 | CI/CD + Phase 4 — Pipeline fusionné `ci-cd.yml` (tests → deploy conditionnel), deploy prod `main` + staging `develop`, EasyAdmin v5 (`/admin` CRUD User + Organization), `app:user:promote`, `GET /health` (DB + Mercure), `RequestMetricsSubscriber` (logs JSON structurés par requête), MonologBundle JSON prod |
+| 0.9 | Mai 2026 | Mise en production complète — DNS Cloudflare DNS-only, Let's Encrypt via Traefik ACME, `wget` ajouté au Dockerfile, Mercure check non-bloquant dans `/health`, `assets:install` ajouté à l'entrypoint, création admin prod via script PHP PDO direct, dashboard `/admin` opérationnel en production |
 
 ---
 
@@ -234,6 +235,13 @@ docker compose down -v
 | 14 | Mercure — `MERCURE_JWT_SECRET` trop court / non résolu en CI | `lcobucci/jwt` exige un secret HMAC-SHA256 d'au moins **256 bits (32 caractères)**. En CI, le bundle Mercure ne résout pas fiablement `%env(MERCURE_JWT_SECRET)%` depuis les env vars du workflow — il utilise une valeur résiduelle courte. | **Solution correcte** : surcharger le secret directement dans `config/packages/mercure.yaml` via `when@test:` avec une valeur hardcodée ≥ 32 chars. Même pattern que `dbname_suffix` dans `doctrine.yaml`. Ne jamais dépendre d'une env var pour le secret Mercure en test. |
 | 15 | CI — `DATABASE_URL` sans `serverVersion` → `Invalid platform version ""` | Passer `DATABASE_URL=postgresql://...@127.0.0.1:5432/sterplatform_test` sans `?serverVersion=18` fait que Doctrine reçoit une version vide et refuse de démarrer : `Invalid platform version "" specified`. | Toujours inclure `?serverVersion=18&charset=utf8` dans le `DATABASE_URL` du workflow CI. |
 | 16 | CI — double suffixe `_test` sur le nom de la base | `doctrine.yaml` (bloc `when@test`) configure `dbname_suffix: '_test'` qui ajoute automatiquement `_test` au nom de la base. En passant `DATABASE_URL=...sterplatform_test` en CI, Doctrine cherche `sterplatform_test_test`. | Passer `sterplatform` (sans `_test`) dans `DATABASE_URL` en CI et dans `.env.test`. Le `dbname_suffix` construit automatiquement `sterplatform_test`. Le service PostgreSQL en CI doit créer `POSTGRES_DB: sterplatform_test`. |
+| 17 | Coolify health check — `wget: not found` | L'image `php:8.4-fpm` n'inclut pas `wget`. Coolify utilise `wget` depuis l'intérieur du container pour vérifier la santé (`GET /health`). Sans `wget`, le health check échoue systématiquement → Coolify marque le deploy comme échoué et rollback. | Ajouter **`wget`** dans la liste `apt-get install` du `Dockerfile` : `nginx supervisor git curl wget zip unzip ...`. |
+| 18 | `/health` retourne 503 — Mercure non joignable en prod | Le check Mercure dans `HealthController` tentait de joindre `MERCURE_HUB_INTERNAL_URL` (ex. `http://mercure/...`). En prod Coolify (container unique), ce hostname n'est pas résolvable → exception → `$checks['mercure'] = 'error'` → `$status = 'error'` → HTTP 503. Coolify health check échoue. | Rendre le check Mercure **non-bloquant** : il ne modifie jamais `$status`. Il retourne `'unreachable'` au lieu de `'error'` si le hub est injoignable. Seul le check DB est fatal. |
+| 19 | Cloudflare proxy (orange cloud) bloque le certificat Let's Encrypt | Le domaine `sterplatform.bichetapps.com` était proxifié par Cloudflare (orange cloud). Traefik utilise le challenge HTTP-01 pour Let's Encrypt : il pose un token sur `http://domaine/.well-known/acme-challenge/<token>`. Cloudflare intercepte la requête de validation de Let's Encrypt → le token n'est jamais trouvé → ACME échoue → pas de certificat → Traefik retourne 404 pour les requêtes HTTPS. | Dans **Cloudflare DNS → Records**, passer tous les enregistrements A concernés (prod + staging) en **DNS only** (nuage gris). Traefik obtient alors les certs Let's Encrypt directement. L'IP du serveur devient publique — acceptable pour un backend API. Alternative avancée : DNS-01 challenge avec API token Cloudflare (garde le proxy orange mais requiert config Traefik supplémentaire). |
+| 20 | `security:hash-password` — invite interactive échoue via `docker exec` sans TTY | En lançant `docker exec container php bin/console security:hash-password` sans `-it`, la commande tente une invite interactive mais ne reçoit aucun input → boucle infinie "The password must not be empty". | Passer le mot de passe **en argument positionnel** : `docker exec container php bin/console security:hash-password 'MonMotDePasse'`. Pas besoin de TTY. |
+| 21 | Bash — `!` dans un mot de passe déclenche l'expansion d'historique | Dans un shell bash interactif, le `!` dans une chaîne entre guillemets doubles est interprété comme un opérateur d'historique (`!',: event not found`). Ex. `"AdminPassword123!"` → erreur bash. | Deux solutions : (1) **`set +H`** avant la commande pour désactiver temporairement l'expansion d'historique. (2) Éviter les `!` dans les mots de passe utilisés via bash, ou utiliser des guillemets simples si possible. |
+| 22 | `app:user:promote` échoue si le user n'existe pas encore en base | La commande `app:user:promote <email>` cherche l'utilisateur en base et retourne `[ERROR] Utilisateur 'email' introuvable.` si le compte n'existe pas. En production avec une base vide, il n'y a aucun compte par défaut. | Créer d'abord le compte (voir Section 10), puis appeler la commande promote. En pratique, utiliser le script PHP PDO direct (Section 10) qui crée ET assigne ROLE_ADMIN en une seule opération. |
+| 23 | EasyAdmin v5 — CSS cassé au premier deploy (grand cercle violet) | Après le premier déploiement, `/admin` affichait un grand cercle violet sans sidebar ni styles corrects. Les assets des bundles Symfony (dont EasyAdmin) ne sont pas copiés dans `public/bundles/` automatiquement à l'installation — il faut lancer `assets:install`. | Ajouter **`php bin/console assets:install --env=prod --no-debug`** dans `docker/php/entrypoint.prod.sh`, après `cache:clear` et avant le démarrage de Supervisor. |
 
 ---
 
@@ -266,6 +274,7 @@ docker compose down -v
 | 21 | Mai 2026 | Phase 3b — Élimination N+1 | `OrganizationMemberRepository` : 3 nouvelles méthodes avec JOIN FETCH. `findByUserWithOrganization(User)` → `OrganizationMember[]` avec org hydratée (remplace `list()` N+1). `findByOrganizationWithUser(Organization)` → `OrganizationMember[]` avec user hydraté (remplace `listMembers()` N+1). `findMembershipByOrgSlug(User, slug)` → membership + org en 1 requête JOIN (remplace `TenantSubscriber` 2-requêtes). `TenantSubscriber` simplifié : injection `OrganizationRepository` supprimée. `EXPLAIN ANALYZE` validé sur chaque requête critique : Index Scan slug, Bitmap Index user_id. Index existants confirmés suffisants (FK + unique constraint). 40/40 tests passants inchangés. |
 | 22 | Mai 2026 | CI/CD pipeline fusionné | Remplacement de `ci.yml` + `tests.yml` + `deploy.yml` par un seul `ci-cd.yml`. Job `deploy` dépend de `tests` (`needs: [tests]`) — aucun deploy sans CI verte. Deploy prod sur push `main` (`COOLIFY_WEBHOOK_URL`), staging sur push `develop` (`COOLIFY_STAGING_WEBHOOK_URL`). `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true` pour préparer la dépréciation Node 20 (juin 2026). Secrets GitHub configurés : `COOLIFY_TOKEN`, `COOLIFY_WEBHOOK_URL`, `COOLIFY_STAGING_WEBHOOK_URL`. Staging : `https://sterplatform.dev.bichetapps.com`, prod : `https://sterplatform.bichetapps.com`. |
 | 23 | Mai 2026 | Phase 4 — Admin EasyAdmin v5 + observabilité | `easycorp/easyadmin-bundle` v5.0.8 installé. `DashboardController` avec attribut `#[AdminDashboard]` (EasyAdmin v5 — `#[Route]` remplacé). `UserCrudController` (index/detail/edit/delete, create désactivé) + `OrganizationCrudController` (CRUD complet). `SecurityController` + `templates/admin/login.html.twig` : form_login session-based sur `/admin`, firewall `admin` séparé du firewall `api` JWT. `access_control` : `/admin/login` PUBLIC_ACCESS, `/admin` ROLE_ADMIN. `app:user:promote <email>` : attribue ROLE_ADMIN en base. `GET /health` : retourne `{"status":"ok/error","checks":{"database":"ok","mercure":"ok"}}` (HTTP 200 ou 503). `RequestMetricsSubscriber` : logue chaque requête en JSON structuré (method, path, status_code, duration_ms) — erreurs 5xx en `error`, 4xx en `warning`, reste en `info`. `symfony/monolog-bundle` v4 + `monolog.yaml` : logs JSON via `monolog.formatter.json` sur `php://stderr` en prod. |
+| 24 | Mai 2026 | Mise en production complète | `wget` ajouté au `Dockerfile` (`apt-get install`). Check Mercure rendu non-bloquant dans `HealthController`. DNS Cloudflare passé en **DNS only** pour `sterplatform.bichetapps.com` et `sterplatform.dev.bichetapps.com` → Let's Encrypt génère les certificats SSL automatiquement via Traefik ACME HTTP-01. `docker restart coolify-proxy` pour forcer le retry ACME après correction DNS. `assets:install` ajouté à `docker/php/entrypoint.prod.sh`. Compte admin `yvenou.alan@gmail.com` créé via script PHP PDO direct (Section 10). Dashboard EasyAdmin opérationnel sur `https://sterplatform.bichetapps.com/admin`. |
 
 ---
 
@@ -278,5 +287,103 @@ docker compose down -v
 - [x] Phase 3 — Mercure Real-time (MercurePublisher, DoctrinePublishSubscriber, GET /api/mercure/token — 40 tests)
 - [x] Phase 3b — Refacto & Élimination N+1 (findByUserWithOrganization, findByOrganizationWithUser, findMembershipByOrgSlug — 40 tests)
 - [x] Phase 4 — Admin & Observabilité (EasyAdmin v5, /admin CRUD, GET /health, RequestMetricsSubscriber, MonologBundle JSON)
+- [x] Mise en production (DNS Cloudflare, Let's Encrypt, compte admin, assets EasyAdmin)
 - [ ] Phase 5 — Migration DartsOpen (entités miroir Supabase, migration données, refactor frontend)
 - [ ] Phase 6 — Production multi-projets (guide intégration, versioning API, OpenAPI publique)
+
+---
+
+## 10. Opérations de maintenance
+
+### Créer le premier compte admin en production
+
+> À faire une seule fois par environnement (prod et staging). Nécessite l'accès au terminal du serveur host.
+
+**Étape 1 — Identifier le container de l'application**
+
+```bash
+docker ps --format "table {{.Names}}\t{{.Status}}" | grep -v coolify
+```
+
+Le container SterPlatform a un nom basé sur l'ID Coolify de l'app (ex. `uwmy2kuvwxd0ss7d1q7sh900-185941490482`).
+
+**Étape 2 — Créer le compte admin via script PHP PDO**
+
+```bash
+docker exec -i <nom_container> php /dev/stdin << 'EOF'
+<?php
+$dsn = getenv('DATABASE_URL');
+preg_match('#postgresql://([^:]+):([^@]+)@([^:]+):(\d+)/([^?]+)#', $dsn, $m);
+[, $user, $pass, $host, $port, $db] = $m;
+$pdo = new PDO("pgsql:host=$host;port=$port;dbname=$db", $user, $pass);
+$hash = password_hash('VotreMotDePasse', PASSWORD_BCRYPT, ['cost' => 13]);
+$existing = $pdo->prepare("SELECT id FROM users WHERE email = ?");
+$existing->execute(['votre@email.com']);
+if ($existing->fetch()) {
+    $stmt = $pdo->prepare("UPDATE users SET password = ?, roles = '[\"ROLE_ADMIN\"]' WHERE email = ?");
+    $stmt->execute([$hash, 'votre@email.com']);
+    echo "Compte mis à jour\n";
+} else {
+    $stmt = $pdo->prepare("INSERT INTO users (id, email, roles, password, is_verified, created_at) VALUES (gen_random_uuid(), ?, '[\"ROLE_ADMIN\"]', ?, true, NOW())");
+    $stmt->execute(['votre@email.com', $hash]);
+    echo "Compte créé\n";
+}
+echo "Verify: " . (password_verify('VotreMotDePasse', $hash) ? 'OK' : 'FAIL') . "\n";
+EOF
+```
+
+> **Notes importantes :**
+> - Le script insère ou met à jour selon que le compte existe ou non
+> - Utiliser `<< 'EOF'` (guillemets simples) pour que bash ne tente pas d'interpréter les `$` du code PHP
+> - Éviter le caractère `!` dans les mots de passe (déclenche l'expansion d'historique bash — utiliser `set +H` si nécessaire)
+
+**Étape 3 — Promouvoir un compte existant**
+
+Si le compte existe déjà mais n'a pas ROLE_ADMIN :
+
+```bash
+docker exec <nom_container> php bin/console app:user:promote votre@email.com
+```
+
+### Vérifier la santé de l'application en prod
+
+```bash
+curl https://sterplatform.bichetapps.com/health
+# Réponse attendue : {"status":"ok","checks":{"database":"ok","mercure":"unreachable"}}
+# mercure:"unreachable" est normal en prod (container unique sans hub Mercure séparé)
+```
+
+### Diagnostiquer un 404 Traefik (Coolify)
+
+Si le site répond 404 malgré un container healthy :
+
+```bash
+# 1. Vérifier que le container tourne
+docker ps | grep <app_id>
+
+# 2. Vérifier les labels Traefik sur le container
+docker inspect <container_name> --format '{{json .Config.Labels}}' | tr ',' '\n' | grep traefik
+
+# 3. Vérifier que le container est sur le réseau coolify
+docker inspect <container_name> --format '{{range $k, $v := .NetworkSettings.Networks}}{{$k}} {{end}}'
+
+# 4. Vérifier que le DNS pointe bien sur le serveur (pas Cloudflare proxy)
+nslookup <domaine> 8.8.8.8
+
+# 5. Vérifier les logs Traefik pour les erreurs ACME (certificat)
+docker logs coolify-proxy --tail 50 2>&1 | grep -i "acme\|cert\|error"
+
+# 6. Si DNS correct mais cert absent : redémarrer Traefik pour forcer retry ACME
+docker restart coolify-proxy
+```
+
+### Configurer Cloudflare DNS pour Let's Encrypt
+
+Traefik utilise le challenge **HTTP-01** pour Let's Encrypt. Le proxy Cloudflare (orange cloud) bloque ce challenge. **Tous les domaines servis par Traefik doivent être en DNS only (nuage gris) dans Cloudflare.**
+
+| Enregistrement | Type | Valeur | Mode |
+|---|---|---|---|
+| `sterplatform` | A | `<IP_serveur>` | DNS only (gris) |
+| `sterplatform.dev` | A | `<IP_serveur>` | DNS only (gris) |
+
+> Après changement DNS : `docker restart coolify-proxy` pour forcer la regénération des certs.

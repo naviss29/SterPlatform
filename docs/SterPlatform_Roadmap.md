@@ -1,9 +1,9 @@
 # SterPlatform — Roadmap & Plan technique
 
-> Version : 0.9 — Phase 4 terminée, CI/CD pipeline complet
+> Version : 1.0 — Production opérationnelle
 > Auteur : Alan
 > Date : Mai 2026
-> Statut : **Phase 4 terminée — Phase 5 (Migration DartsOpen) à démarrer**
+> Statut : **Production en ligne — https://sterplatform.bichetapps.com — Phase 5 (Migration DartsOpen) à démarrer**
 
 ---
 
@@ -52,7 +52,7 @@ Supabase Free présente des limitations bloquantes :
 | Auth | LexikJWTAuthenticationBundle 3 | JWT access + refresh tokens, standard industrie |
 | Temps réel | Mercure (hub) | SSE pub/sub, inventé par l'équipe Symfony, facile à déployer |
 | Email | Symfony Mailer + Twig | Templates HTML, SMTP / Mailpit en dev |
-| Admin | EasyAdmin 4 | Dashboard rapide à générer depuis les entités |
+| Admin | EasyAdmin 5 | Dashboard `/admin` CRUD User + Organization, login session-based |
 | Tests | PHPUnit + ApiTestCase | Tests unitaires + intégration API |
 | Base de données | PostgreSQL 18 | Même DB que Supabase — migration facilitée |
 | Containerisation | Docker + Docker Compose | Déploiement Coolify identique aux autres projets |
@@ -246,11 +246,15 @@ Chaque projet (DartsOpen, FestManager…) étend ce socle avec ses propres entit
 
 - [x] EasyAdmin v5 — CRUD User, Organization — `/admin` (ROLE_ADMIN) ✅
 - [x] `app:user:promote <email>` — commande console pour attribuer ROLE_ADMIN ✅
-- [x] Health check `GET /health` — vérifie DB + Mercure hub ✅
+- [x] Health check `GET /health` — vérifie DB (fatal) + Mercure (non-bloquant) ✅
 - [x] Logs structurés JSON — MonologBundle + `monolog.formatter.json` sur `php://stderr` ✅
 - [x] Métriques basiques — `RequestMetricsSubscriber` (method/path/status/duration_ms par requête) ✅
+- [x] `wget` ajouté au Dockerfile (Coolify health check) ✅
+- [x] `assets:install` ajouté à l'entrypoint (CSS EasyAdmin) ✅
+- [x] DNS Cloudflare configuré DNS-only — certificats Let's Encrypt générés via Traefik ✅
+- [x] Compte admin `yvenou.alan@gmail.com` créé en production ✅
 
-**Livrable :** Dashboard admin sur `/admin`, health check sur `/health`, métriques dans les logs Coolify. ✅
+**Livrable :** Dashboard admin sur `https://sterplatform.bichetapps.com/admin`, health check sur `/health`, métriques dans les logs Coolify, SSL Let's Encrypt valide. ✅
 
 ---
 
@@ -310,7 +314,7 @@ Chaque projet (DartsOpen, FestManager…) étend ce socle avec ses propres entit
 | Phase 2 — Multi-tenancy | ✅ 1 session | ~~🟠 Haute~~ |
 | Phase 3 — Mercure | ✅ 1 session | ~~🟠 Haute~~ |
 | Phase 3b — Refacto + N+1 | ✅ 1 session | ~~🟠 Haute~~ |
-| Phase 4 — Admin | ✅ 1 session | ~~🟡 Moyenne~~ |
+| Phase 4 — Admin + Mise en prod | ✅ 2 sessions | ~~🟡 Moyenne~~ |
 | Phase 5 — Migration DartsOpen | 4-5 sessions | 🟡 Moyenne (après Phase 3b) |
 | Phase 6 — Multi-projets | 1-2 sessions | 🟢 Basse |
 
