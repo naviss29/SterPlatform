@@ -1,4 +1,4 @@
-name: Tests
+name: CI/CD
 
 on:
   push:
@@ -55,3 +55,26 @@ jobs:
 
       - name: Run tests
         run: php bin/phpunit
+
+  deploy:
+    name: Deploy vers Coolify
+    runs-on: ubuntu-latest
+    needs: [tests]
+    if: github.event_name == 'push'
+
+    steps:
+      - name: Deploy prod (main)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          curl --silent --show-error --fail \
+            -X GET \
+            -H "Authorization: Bearer ${{ secrets.COOLIFY_TOKEN }}" \
+            "${{ secrets.COOLIFY_WEBHOOK_URL }}"
+
+      - name: Deploy staging (develop)
+        if: github.ref == 'refs/heads/develop'
+        run: |
+          curl --silent --show-error --fail \
+            -X GET \
+            -H "Authorization: Bearer ${{ secrets.COOLIFY_TOKEN }}" \
+            "${{ secrets.COOLIFY_STAGING_WEBHOOK_URL }}"
