@@ -21,7 +21,7 @@ FROM php:8.4-fpm
 
 RUN apt-get update && apt-get install -y \
     nginx supervisor \
-    git curl zip unzip libpq-dev libicu-dev libzip-dev \
+    git curl wget zip unzip libpq-dev libicu-dev libzip-dev \
     && docker-php-ext-install pdo pdo_pgsql intl zip opcache \
     && pecl install apcu \
     && docker-php-ext-enable apcu \
