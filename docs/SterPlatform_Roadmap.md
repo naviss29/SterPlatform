@@ -1,9 +1,9 @@
 # SterPlatform — Roadmap & Plan technique
 
-> Version : 1.0 — Production opérationnelle
+> Version : 1.1 — Phase 5a terminée
 > Auteur : Alan
 > Date : Mai 2026
-> Statut : **Production en ligne — https://sterplatform.bichetapps.com — Phase 5 (Migration DartsOpen) à démarrer**
+> Statut : **Production en ligne — https://sterplatform.bichetapps.com — Phase 5b (auth DartsOpen) à démarrer**
 
 ---
 
@@ -262,11 +262,15 @@ Chaque projet (DartsOpen, FestManager…) étend ce socle avec ses propres entit
 
 **Objectif :** Migrer DartsOpen de Supabase vers SterPlatform.
 
-#### 5a — Schéma & Entités
-- [ ] Créer toutes les entités Doctrine miroir du schéma Supabase DartsOpen
-  - `Tournament`, `Round`, `Registration`, `Pool`, `PoolPlayer`, `Match`, `MatchSet`
-- [ ] Migrations Doctrine
-- [ ] Scripts de migration des données existantes (Supabase → SterPlatform)
+#### 5a — Schéma & Entités ✅ *(terminée)*
+- [x] Créer toutes les entités Doctrine miroir du schéma Supabase DartsOpen
+  - `Tournament`, `Round`, `Registration`, `Pool`, `PoolPlayer`, `DartsMatch` (mot-clé PHP), `MatchSet`
+- [x] 8 enums : `GameType`, `EntryType`, `FinishType`, `TournamentStatus`, `MatchStatus`, `RegistrationStatus`, `RegistrationMode`, `ScoringMode`
+- [x] 7 repositories avec JOIN FETCH
+- [x] Migration Doctrine `Version20260515210041` (7 tables + FK + indexes)
+- [x] TenantFilter + DoctrinePublishSubscriber compatibles (`getOrganization()` sur toutes les entités)
+- [x] 45/45 tests passants (aucune régression)
+- [ ] Scripts de migration des données existantes (Supabase → SterPlatform) *(reporté Phase 5e)*
 
 #### 5b — Auth frontend
 - [ ] Remplacer `@supabase/ssr` par des appels fetch vers `/api/auth/*`
@@ -315,7 +319,8 @@ Chaque projet (DartsOpen, FestManager…) étend ce socle avec ses propres entit
 | Phase 3 — Mercure | ✅ 1 session | ~~🟠 Haute~~ |
 | Phase 3b — Refacto + N+1 | ✅ 1 session | ~~🟠 Haute~~ |
 | Phase 4 — Admin + Mise en prod | ✅ 2 sessions | ~~🟡 Moyenne~~ |
-| Phase 5 — Migration DartsOpen | 4-5 sessions | 🟡 Moyenne (après Phase 3b) |
+| Phase 5a — Entités DartsOpen | ✅ 1 session | ~~🟡 Moyenne~~ |
+| Phase 5b/c/d/e — Migration frontend | 3-4 sessions | 🟡 Moyenne |
 | Phase 6 — Multi-projets | 1-2 sessions | 🟢 Basse |
 
 **Total estimé : 15-22 sessions**

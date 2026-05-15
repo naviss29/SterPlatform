@@ -1,9 +1,9 @@
 # SterPlatform — Documentation technique
 
-> Version : 0.9
+> Version : 1.0
 > Auteur : Alan
 > Date : Mai 2026
-> Statut : **Production opérationnelle — https://sterplatform.bichetapps.com — Phase 5 (Migration DartsOpen) à démarrer**
+> Statut : **Production opérationnelle — https://sterplatform.bichetapps.com — Phase 5a terminée, Phase 5b (auth DartsOpen) à démarrer**
 
 ---
 
@@ -20,6 +20,7 @@
 | 0.7 | Mai 2026 | Phase 3b — Élimination N+1 : `findByUserWithOrganization`, `findByOrganizationWithUser`, `findMembershipByOrgSlug`, `TenantSubscriber` simplifié (OrganizationRepository supprimé), EXPLAIN validé, 40/40 tests passants |
 | 0.8 | Mai 2026 | CI/CD + Phase 4 — Pipeline fusionné `ci-cd.yml` (tests → deploy conditionnel), deploy prod `main` + staging `develop`, EasyAdmin v5 (`/admin` CRUD User + Organization), `app:user:promote`, `GET /health` (DB + Mercure), `RequestMetricsSubscriber` (logs JSON structurés par requête), MonologBundle JSON prod |
 | 0.9 | Mai 2026 | Mise en production complète — DNS Cloudflare DNS-only, Let's Encrypt via Traefik ACME, `wget` ajouté au Dockerfile, Mercure check non-bloquant dans `/health`, `assets:install` ajouté à l'entrypoint, création admin prod via script PHP PDO direct, dashboard `/admin` opérationnel en production |
+| 1.0 | Mai 2026 | Phase 5a — Entités Doctrine DartsOpen : 8 enums (GameType, EntryType, FinishType, TournamentStatus, MatchStatus, RegistrationStatus, RegistrationMode, ScoringMode), 7 entités (Tournament, Round, Registration, Pool, PoolPlayer, DartsMatch, MatchSet), 7 repositories avec JOIN FETCH, migration auto-générée (7 tables + FK + indexes), TenantFilter + DoctrinePublishSubscriber compatibles, 45/45 tests passants |
 
 ---
 
@@ -275,6 +276,7 @@ docker compose down -v
 | 22 | Mai 2026 | CI/CD pipeline fusionné | Remplacement de `ci.yml` + `tests.yml` + `deploy.yml` par un seul `ci-cd.yml`. Job `deploy` dépend de `tests` (`needs: [tests]`) — aucun deploy sans CI verte. Deploy prod sur push `main` (`COOLIFY_WEBHOOK_URL`), staging sur push `develop` (`COOLIFY_STAGING_WEBHOOK_URL`). `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true` pour préparer la dépréciation Node 20 (juin 2026). Secrets GitHub configurés : `COOLIFY_TOKEN`, `COOLIFY_WEBHOOK_URL`, `COOLIFY_STAGING_WEBHOOK_URL`. Staging : `https://sterplatform.dev.bichetapps.com`, prod : `https://sterplatform.bichetapps.com`. |
 | 23 | Mai 2026 | Phase 4 — Admin EasyAdmin v5 + observabilité | `easycorp/easyadmin-bundle` v5.0.8 installé. `DashboardController` avec attribut `#[AdminDashboard]` (EasyAdmin v5 — `#[Route]` remplacé). `UserCrudController` (index/detail/edit/delete, create désactivé) + `OrganizationCrudController` (CRUD complet). `SecurityController` + `templates/admin/login.html.twig` : form_login session-based sur `/admin`, firewall `admin` séparé du firewall `api` JWT. `access_control` : `/admin/login` PUBLIC_ACCESS, `/admin` ROLE_ADMIN. `app:user:promote <email>` : attribue ROLE_ADMIN en base. `GET /health` : retourne `{"status":"ok/error","checks":{"database":"ok","mercure":"ok"}}` (HTTP 200 ou 503). `RequestMetricsSubscriber` : logue chaque requête en JSON structuré (method, path, status_code, duration_ms) — erreurs 5xx en `error`, 4xx en `warning`, reste en `info`. `symfony/monolog-bundle` v4 + `monolog.yaml` : logs JSON via `monolog.formatter.json` sur `php://stderr` en prod. |
 | 24 | Mai 2026 | Mise en production complète | `wget` ajouté au `Dockerfile` (`apt-get install`). Check Mercure rendu non-bloquant dans `HealthController`. DNS Cloudflare passé en **DNS only** pour `sterplatform.bichetapps.com` et `sterplatform.dev.bichetapps.com` → Let's Encrypt génère les certificats SSL automatiquement via Traefik ACME HTTP-01. `docker restart coolify-proxy` pour forcer le retry ACME après correction DNS. `assets:install` ajouté à `docker/php/entrypoint.prod.sh`. Compte admin `yvenou.alan@gmail.com` créé via script PHP PDO direct (Section 10). Dashboard EasyAdmin opérationnel sur `https://sterplatform.bichetapps.com/admin`. |
+| 25 | Mai 2026 | Phase 5a — Entités DartsOpen | **8 enums PHP** : `GameType` (CRICKET/501/701/901/1001 — cases G501..G1001 car noms numériques invalides en PHP), `EntryType`, `FinishType`, `TournamentStatus`, `MatchStatus`, `RegistrationStatus`, `RegistrationMode`, `ScoringMode`. **7 entités Doctrine** miroir du schéma Supabase DartsOpen : `Tournament` (lié à `Organization`, `getOrganization()` → TenantFilter + DoctrinePublishSubscriber automatiques), `Round` (UNIQUE tournament_id+round_order, colonne `round_order` pour éviter le mot réservé SQL `order`), `Registration` (`player_names` en JSON, `qrCodeToken` UUID auto-généré, `getOrganization()` délégué), `Pool` + `PoolPlayer` (UNIQUE pool_id+registration_id), `DartsMatch` (nom évitant le mot-clé PHP 8 `match`, table `matches`, pool nullable), `MatchSet` (FK vers `Round` au lieu d'un entier nu, UNIQUE match_id+round_id). **7 repositories** avec méthodes JOIN FETCH (`findWithRounds`, `findLiveByTournament`, `findWithPlayersByTournament`…). **Migration auto-générée** `Version20260515210041` : 7 tables, toutes FK et indexes. `orderBy` sur `OneToMany` retiré (non supporté dans la version Doctrine utilisée — faire l'ordre en DQL). **45/45 tests passants** (aucune régression). |
 
 ---
 
@@ -288,7 +290,11 @@ docker compose down -v
 - [x] Phase 3b — Refacto & Élimination N+1 (findByUserWithOrganization, findByOrganizationWithUser, findMembershipByOrgSlug — 40 tests)
 - [x] Phase 4 — Admin & Observabilité (EasyAdmin v5, /admin CRUD, GET /health, RequestMetricsSubscriber, MonologBundle JSON)
 - [x] Mise en production (DNS Cloudflare, Let's Encrypt, compte admin, assets EasyAdmin)
-- [ ] Phase 5 — Migration DartsOpen (entités miroir Supabase, migration données, refactor frontend)
+- [x] Phase 5a — Entités DartsOpen (8 enums, 7 entités Doctrine, 7 repositories, migration — 45 tests)
+- [ ] Phase 5b — Auth DartsOpen (remplacer @supabase/ssr par fetch /api/auth/*, middleware Next.js, client JWT)
+- [ ] Phase 5c — API calls DartsOpen (remplacer supabase.from(...) par fetch SterPlatform, server actions)
+- [ ] Phase 5d — Real-time DartsOpen (remplacer Supabase Realtime par EventSource Mercure)
+- [ ] Phase 5e — Tests & recette end-to-end
 - [ ] Phase 6 — Production multi-projets (guide intégration, versioning API, OpenAPI publique)
 
 ---
