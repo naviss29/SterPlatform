@@ -22,6 +22,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Mercure\Jwt\TokenFactoryInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[Route('/api')]
@@ -34,6 +35,7 @@ class TournamentController extends AbstractController
         private readonly RegistrationRepository       $registrationRepo,
         private readonly OrganizationRepository       $organizationRepo,
         private readonly OrganizationMemberRepository $memberRepo,
+        private readonly TokenFactoryInterface        $defaultTokenFactory,
     ) {}
 
     // ── List ──────────────────────────────────────────────────────────────────
@@ -96,6 +98,20 @@ class TournamentController extends AbstractController
         $data['registered_count'] = count($this->registrationRepo->findPaidByTournament($tournament));
 
         return $this->json($data);
+    }
+
+    // Public Mercure subscriber token (no auth — scoped to one tournament's topic)
+    #[Route('/public/tournaments/{id}/mercure-token', name: 'api_public_tournament_mercure_token', methods: ['GET'])]
+    public function mercureToken(string $id): JsonResponse
+    {
+        $tournament = $this->tournamentRepo->find($id);
+        if (!$tournament) return $this->json(['error' => 'Tournoi introuvable.'], 404);
+
+        $orgSlug = $tournament->getOrganization()->getSlug();
+        $topic = "orgs/{$orgSlug}/tournaments/{$id}";
+        $token = $this->defaultTokenFactory->create([$topic], null, []);
+
+        return $this->json(['token' => $token, 'topic' => $topic]);
     }
 
     // ── Update ────────────────────────────────────────────────────────────────

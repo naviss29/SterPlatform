@@ -45,13 +45,33 @@ class DoctrinePublishSubscriber implements EventSubscriber
         }
 
         $entityType = strtolower((new \ReflectionClass($entity))->getShortName());
-
         $data = ['action' => $action, 'id' => method_exists($entity, 'getId') ? (string) $entity->getId() : null];
 
         try {
-            $this->publisher->publishToOrganization($organization->getSlug(), $entityType, $data);
+            $tournamentId = $this->extractTournamentId($entity);
+            if ($tournamentId !== null) {
+                $this->publisher->publishWithTournamentTopic($organization->getSlug(), $tournamentId, $entityType, $data);
+            } else {
+                $this->publisher->publishToOrganization($organization->getSlug(), $entityType, $data);
+            }
         } catch (\Throwable) {
             // Hub unreachable — don't fail the DB transaction
         }
+    }
+
+    private function extractTournamentId(object $entity): ?string
+    {
+        if (method_exists($entity, 'getTournament')) {
+            $tournament = $entity->getTournament();
+            return $tournament?->getId() ? (string) $tournament->getId() : null;
+        }
+        if (method_exists($entity, 'getMatch')) {
+            $match = $entity->getMatch();
+            if ($match && method_exists($match, 'getTournament')) {
+                $tournament = $match->getTournament();
+                return $tournament?->getId() ? (string) $tournament->getId() : null;
+            }
+        }
+        return null;
     }
 }
