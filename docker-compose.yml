@@ -52,6 +52,13 @@ services:
       - "9090:80"
     command: /usr/bin/caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
 
+  mailer:
+    image: axllent/mailpit:latest
+    ports:
+      - "8025:8025"
+    environment:
+      MP_SMTP_AUTH_ALLOW_INSECURE: "true"
+
 volumes:
   db_data:
   vendor_data:

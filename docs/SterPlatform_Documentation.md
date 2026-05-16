@@ -1,6 +1,6 @@
 # SterPlatform — Documentation technique
 
-> Version : 1.3
+> Version : 1.4
 > Auteur : Alan
 > Date : Mai 2026
 > Statut : **Production opérationnelle — https://sterplatform.bichetapps.com — Nettoyage Phase 5a/5c/5d : SterPlatform redevenu infra générique (auth + Mercure), aucun métier applicatif**
@@ -24,6 +24,7 @@
 | 1.1 | Mai 2026 | Phase 5b — Auth DartsOpen : `AuthController` étendu (`redirect_uri` sur verify, `verifyRedirectUri`/`resetRedirectBaseUrl` dans les body), `MailerService` mis à jour, 46/46 tests SterPlatform. DartsOpen : `lib/api/client.ts`, `lib/api/auth.ts` (getUser, setAuthCookies, tryRefresh), `lib/actions/auth.ts`, `middleware.ts`, layout dashboard, pages auth/reset-password/verified. |
 | 1.2 | Mai 2026 | Phase 5c — Migration DartsOpen complète (Supabase supprimé hors Stripe) : sérializers SterPlatform standardisés en snake_case (TournamentController, PoolController, MatchController), `registered_count` ajouté à `/api/public/tournaments/{id}`. DartsOpen : 7 pages dashboard + 3 pages publiques réécrites, 4 composants (ScoreForm, MatchBoard, ScoreBoard, BracketLive) sans Supabase. Polling REST (3-5s) remplace Supabase Realtime. |
 | 1.3 | Mai 2026 | Nettoyage architectural — SterPlatform redevenu infra générique : suppression des 8 enums, 7 entités, 7 repositories, 4 controllers DartsOpen-spécifiques (TournamentController, PoolController, MatchController, MatchSetController) et de la migration Phase 5a. Revert des changements Phase 5d dans MercurePublisher et DoctrinePublishSubscriber. SterPlatform = auth + Mercure uniquement, aucun métier applicatif. 46/46 tests passants. |
+| 1.4 | Mai 2026 | Mailpit restauré dans docker-compose.yml — service `mailer` (axllent/mailpit:latest, port 8025, MP_SMTP_AUTH_ALLOW_INSECURE) pour intercepter les emails en local. Permet de tester les flows register/forgot-password sans serveur SMTP réel. |
 
 ---
 
