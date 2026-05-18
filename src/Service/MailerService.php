@@ -59,8 +59,14 @@ class MailerService
 
     public function sendFromTemplate(EmailTemplate $template, string $to, array $variables): void
     {
-        $subject = $this->twig->createTemplate($template->getSubject())->render($variables);
-        $html    = $this->twig->createTemplate($template->getHtmlBody())->render($variables);
+        $loader = new \Twig\Loader\ArrayLoader([
+            'subject'  => $template->getSubject(),
+            'htmlBody' => $template->getHtmlBody(),
+        ]);
+        $twig = new \Twig\Environment($loader, ['cache' => false]);
+
+        $subject = $twig->render('subject', $variables);
+        $html    = $twig->render('htmlBody', $variables);
 
         $email = (new Email())
             ->from($this->fromEmail)
