@@ -9,16 +9,10 @@ class TenantFilter extends SQLFilter
 {
     public function addFilterConstraint(ClassMetadata $targetEntity, string $targetTableAlias): string
     {
-        if (!$targetEntity->hasField('organizationId') && !$targetEntity->hasAssociation('organization')) {
+        if (!$targetEntity->hasAssociation('organization')) {
             return '';
         }
 
-        $orgId = $this->getParameter('organization_id');
-
-        if ($targetEntity->hasAssociation('organization')) {
-            return sprintf('%s.organization_id = %s', $targetTableAlias, $orgId);
-        }
-
-        return '';
+        return sprintf('%s.organization_id = %s', $targetTableAlias, $this->getParameter('organization_id'));
     }
 }

@@ -5,7 +5,7 @@
 ![Status](https://img.shields.io/badge/status-Production-brightgreen)
 ![Symfony](https://img.shields.io/badge/Symfony-8.0-black)
 ![PHP](https://img.shields.io/badge/PHP-8.4-777BB4)
-![Tests](https://img.shields.io/badge/tests-40%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-52%20passing-brightgreen)
 ![Docker](https://img.shields.io/badge/Docker-Compose-blue)
 
 **Production :** https://sterplatform.bichetapps.com  
@@ -112,11 +112,11 @@ curl http://localhost:8080/health
 | `GET` | `/api/auth/me` | Profil utilisateur (JWT requis) |
 | `GET` | `/api/mercure/token` | JWT Mercure pour s'abonner au SSE |
 
-### Email (à venir — Phase 5)
+### Email
 
-| Méthode | URL | Description |
-|---|---|---|
-| `POST` | `/api/email/send` | Envoi d'un email via template slug |
+| Méthode | URL | Auth | Description |
+|---|---|---|---|
+| `POST` | `/api/email/send` | `X-App-Token` | Envoi d'un email via template slug + variables Twig |
 
 ---
 
@@ -145,6 +145,9 @@ docker compose logs -f php
 |---|---|---|
 | `APP_ENV` | Environnement (`dev` / `prod`) | `dev` |
 | `APP_SECRET` | Clé secrète Symfony (32 hex) | généré |
+| `APP_URL` | URL publique de l'application (sans slash final) | `http://localhost:8080` |
+| `APP_FROM_EMAIL` | Adresse expéditeur (doit être vérifiée dans Brevo) | `noreply@votre-domaine.fr` |
+| `APP_TOKEN` | Token partagé avec les apps clientes pour `POST /api/email/send` | généré (32 hex) |
 | `DATABASE_URL` | DSN PostgreSQL | `postgresql://...` |
 | `JWT_PASSPHRASE` | Passphrase clés JWT RSA | `votre_passphrase` |
 | `MERCURE_JWT_SECRET` | Secret JWT Mercure (≥ 256 bits) | `votre_secret` |
@@ -155,8 +158,8 @@ docker compose logs -f php
 ## Tests
 
 ```bash
-docker compose run --rm php php bin/phpunit
-# 40/40 tests passants
+docker compose run --rm -e APP_ENV=test php php bin/phpunit
+# 52/52 tests passants
 ```
 
 ---
@@ -172,8 +175,8 @@ docker compose run --rm php php bin/phpunit
 | 3 | Mercure Real-time (MercurePublisher, token endpoint) | ✅ |
 | 3b | Refacto + élimination N+1 (JOIN FETCH) | ✅ |
 | 4 | Admin EasyAdmin v5 + /health + métriques + déploiement prod | ✅ |
-| 5 | Email + Gestion des templates (Brevo, EmailTemplate, POST /api/email/send) | ❌ |
-| 5-cleanup | Suppression entités Doctrine DartsOpen orphelines | ❌ |
+| 5 | Email + Gestion des templates (Brevo, EmailTemplate, POST /api/email/send) | ✅ |
+| 5-cleanup | Suppression entités Doctrine DartsOpen orphelines + refacto | ✅ |
 | 6 | Intégration DartsOpen (câblage email) | ❌ |
 | 7 | Intégration FestManager (migration auth + email) | ❌ |
 | 8 | Hardening (rate limiting, backups, monitoring, guide) | ❌ |

@@ -1,9 +1,9 @@
 # SterPlatform — Roadmap & Plan technique
 
-> Version : 2.0 — Vision architecture validée
+> Version : 2.1 — Phase 5 terminée
 > Auteur : Alan
 > Date : Mai 2026
-> Statut : **Production en ligne — https://sterplatform.bichetapps.com — Phase 5 (Email + Templates) à démarrer**
+> Statut : **Production en ligne — https://sterplatform.bichetapps.com — Phase 6 (Intégration DartsOpen email) à démarrer**
 
 ---
 
@@ -130,7 +130,7 @@ EmailTemplate
 ├── project (étiquette — ex. "dartsopen", "festmanager", "global")
 ├── subject (ligne objet, peut contenir des variables Twig)
 ├── html_body (template Twig complet)
-├── expected_variables (description des variables disponibles)
+├── description (liste des variables disponibles, à titre informatif)
 └── created_at / updated_at
 ```
 
@@ -269,44 +269,44 @@ EmailTemplate
 
 ---
 
-### Phase 5 — Email + Gestion des templates *(2-3 sessions)*
+### Phase 5 — Email + Gestion des templates ✅ *(terminée)*
 
 **Objectif :** Faire de SterPlatform la plateforme d'envoi d'emails centralisée pour toutes les applications.
 
 #### 5a — Infrastructure email
-- [ ] Configurer Brevo comme provider SMTP (`MAILER_DSN=smtp://...@smtp-relay.brevo.com:587`)
-- [ ] Configurer `MAILER_DSN` dans Coolify (staging + prod)
-- [ ] Valider l'envoi depuis les templates existants (verification, reset_password)
+- [x] Configurer Brevo comme provider SMTP (`MAILER_DSN=smtp://...@smtp-relay.brevo.com:587`)
+- [x] Configurer `MAILER_DSN` dans Coolify (staging + prod)
+- [x] Valider l'envoi depuis les templates existants (verification, reset_password)
 
 #### 5b — Entité EmailTemplate
-- [ ] Entity `EmailTemplate` (slug, project, subject, html_body, expected_variables, timestamps) + migration
-- [ ] EasyAdmin CRUD pour `EmailTemplate` (avec champ texte long pour html_body)
-- [ ] Seeder de templates existants (verification, reset_password) → migration vers EmailTemplate en base
+- [x] Entity `EmailTemplate` (slug, project, subject, html_body, description, timestamps) + migration
+- [x] EasyAdmin CRUD pour `EmailTemplate` (avec champ texte long pour html_body)
 
 #### 5c — Endpoint d'envoi
-- [ ] `POST /api/email/send` — prend `template` (slug), `to`, `variables` (JSON)
-- [ ] Authentification par token applicatif (header `X-App-Token`) — différent du JWT utilisateur
-- [ ] Rendu Twig à la volée depuis le html_body stocké en base
-- [ ] Gestion des erreurs (template introuvable, variables manquantes, SMTP failure)
-- [ ] Tests PHPUnit : send valide, template introuvable, token invalide, variables manquantes
+- [x] `POST /api/email/send` — prend `template` (slug), `to`, `variables` (JSON)
+- [x] Authentification par token applicatif (header `X-App-Token`) — différent du JWT utilisateur
+- [x] Rendu Twig à la volée depuis le html_body stocké en base via `ArrayLoader` (sans cache filesystem)
+- [x] Gestion des erreurs (template introuvable, email invalide, token invalide)
+- [x] Firewall `email_api` dédié (`security: false`) pour bypasser le JWT sur `/api/email`
+- [x] Tests PHPUnit : token absent, token invalide, champ manquant, email invalide, template introuvable, envoi OK — 52/52 passants
 
-**Livrable :** `POST /api/email/send` opérationnel. Brevo configuré. CRUD templates dans EasyAdmin. 40+ tests passants.
+**Livrable :** `POST /api/email/send` opérationnel en staging et production. Brevo configuré. CRUD templates dans EasyAdmin. 52/52 tests passants. ✅
 
 ---
 
-### Phase 5b-cleanup — Suppression entités métier DartsOpen *(1 session)*
+### Phase 5-cleanup — Suppression entités métier DartsOpen + refacto ✅ *(terminée)*
 
-**Contexte :** En Phase 5a (Mai 2026), des entités Doctrine miroir du schéma DartsOpen ont été créées dans SterPlatform (`Tournament`, `Round`, `Registration`, `Pool`, `PoolPlayer`, `DartsMatch`, `MatchSet`). Cette décision a été abandonnée — DartsOpen utilise désormais Prisma direct sur sa propre base.
+**Contexte :** Des entités Doctrine miroir du schéma DartsOpen avaient été créées dans SterPlatform (`Tournament`, `Round`, `Registration`, `Pool`, `PoolPlayer`, `DartsMatch`, `MatchSet`). Cette décision a été abandonnée — DartsOpen utilise désormais Prisma direct sur sa propre base.
 
-**Objectif :** Nettoyer SterPlatform des entités qui ne lui appartiennent pas.
+**Objectif :** Nettoyer SterPlatform des entités qui ne lui appartiennent pas et assainir le code.
 
-- [ ] Supprimer les entités : `Tournament`, `Round`, `Registration`, `Pool`, `PoolPlayer`, `DartsMatch`, `MatchSet`
-- [ ] Supprimer les 8 enums DartsOpen
-- [ ] Supprimer les 7 repositories associés
-- [ ] Créer une migration Doctrine `DROP TABLE` pour les 7 tables
-- [ ] Vérifier que les 40 tests existants passent toujours (aucune régression)
+- [x] Supprimer les entités DartsOpen + 8 enums + 7 repositories associés
+- [x] Simplifier `TenantFilter` — suppression du code mort (`hasField('organizationId')`)
+- [x] Mise à jour README (badge tests 52, phases, env vars, commandes)
+- [x] Mise à jour Roadmap (statuts, structure projet, modèle de données)
+- [x] 52/52 tests passants — aucune régression
 
-**Livrable :** SterPlatform ne contient que : User, Organization, OrganizationMember, RefreshToken, EmailTemplate.
+**Livrable :** SterPlatform ne contient que : User, Organization, OrganizationMember, RefreshToken, EmailTemplate. ✅
 
 ---
 
@@ -377,8 +377,8 @@ EmailTemplate
 | Phase 3 — Mercure | 1 session | ~~🟠 Haute~~ | ✅ |
 | Phase 3b — Refacto + N+1 | 1 session | ~~🟠 Haute~~ | ✅ |
 | Phase 4 — Admin + Mise en prod | 2 sessions | ~~🟡 Moyenne~~ | ✅ |
-| Phase 5 — Email + Templates | 2-3 sessions | 🔴 Critique | ❌ À faire |
-| Phase 5b-cleanup — Suppression entités DartsOpen | 1 session | 🟠 Haute | ❌ À faire |
+| Phase 5 — Email + Templates | 2-3 sessions | ~~🔴 Critique~~ | ✅ |
+| Phase 5-cleanup — Suppression entités DartsOpen + refacto | 1 session | ~~🟠 Haute~~ | ✅ |
 | Phase 6 — Intégration DartsOpen (email) | 1-2 sessions | 🟠 Haute | ❌ À faire |
 | Phase 7 — Intégration FestManager (auth + email) | 2-3 sessions | 🟡 Moyenne | ❌ À faire |
 | Phase 8 — Hardening & Documentation | 1 session | 🟢 Basse | ❌ À faire |
@@ -404,27 +404,27 @@ EmailTemplate
 ```
 SterPlatform/
 ├── config/
-│   ├── packages/          # Config API Platform, LexikJWT, Mercure…
+│   ├── packages/          # Config API Platform, LexikJWT, Mercure, Mailer…
 │   └── routes/
 ├── src/
-│   ├── Entity/            # User, Organization, OrganizationMember
-│   ├── Repository/
-│   ├── Security/          # Voters, JWT authenticator
-│   ├── Controller/        # Auth endpoints (register, login, reset…)
-│   ├── Service/           # MercurePublisher, MailerService, TokenService
-│   ├── EventSubscriber/   # Doctrine listener → Mercure publish
-│   └── Extension/         # TenantFilter (Doctrine)
+│   ├── Entity/            # User, Organization, OrganizationMember, EmailTemplate
+│   ├── Repository/        # UserRepository, OrganizationRepository…
+│   ├── Security/          # OrganizationVoter
+│   ├── Controller/        # Auth, Organization, Email, Mercure, Health + Admin/
+│   ├── Service/           # MailerService, MercurePublisher, TenantContext
+│   ├── EventSubscriber/   # TenantSubscriber, DoctrinePublishSubscriber, RequestMetricsSubscriber
+│   ├── Doctrine/          # TenantFilter (SQLFilter multi-tenancy)
+│   ├── Enum/              # OrganizationRole
+│   └── Command/           # app:user:promote
 ├── templates/
-│   └── emails/            # Twig email templates
+│   └── emails/            # Twig email templates statiques (verification, reset_password)
 ├── migrations/
 ├── tests/
-│   ├── Unit/
-│   └── Api/               # ApiTestCase (API Platform)
+│   └── Controller/        # WebTestCase pour Auth, Organization, Email, Mercure
 ├── docker/
 │   ├── php/Dockerfile
 │   └── nginx/nginx.conf
 ├── docker-compose.yml
-├── docker-compose.prod.yml
 ├── docs/
 │   └── SterPlatform_Roadmap.md
 └── .env.example
@@ -432,12 +432,12 @@ SterPlatform/
 
 ---
 
-## 9. Prochaine session — Phase 5
+## 9. Prochaine session — Phase 6
 
 Actions concrètes pour démarrer :
 
-1. Configurer `MAILER_DSN` Brevo dans Coolify (staging puis prod)
-2. Créer l'entité `EmailTemplate` + migration Doctrine
-3. Ajouter le CRUD EasyAdmin pour `EmailTemplate`
-4. Implémenter `POST /api/email/send` avec rendu Twig dynamique
-5. Écrire les tests PHPUnit pour l'endpoint email
+1. Identifier les emails à envoyer depuis DartsOpen (inscription, confirmation paiement, invitation, résultats)
+2. Créer les templates correspondants dans SterPlatform via EasyAdmin
+3. Créer `lib/api/sterplatform-email.ts` dans DartsOpen — client HTTP vers `POST /api/email/send`
+4. Appeler ce client depuis les Server Actions concernées
+5. Configurer `APP_TOKEN` DartsOpen dans Coolify (variable d'env côté DartsOpen)
