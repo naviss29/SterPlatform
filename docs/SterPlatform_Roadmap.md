@@ -1,9 +1,9 @@
 # SterPlatform — Roadmap & Plan technique
 
-> Version : 1.1 — Phase 5a terminée
+> Version : 2.0 — Vision architecture validée
 > Auteur : Alan
 > Date : Mai 2026
-> Statut : **Production en ligne — https://sterplatform.bichetapps.com — Phase 5b (auth DartsOpen) à démarrer**
+> Statut : **Production en ligne — https://sterplatform.bichetapps.com — Phase 5 (Email + Templates) à démarrer**
 
 ---
 
@@ -21,17 +21,17 @@ Supabase Free présente des limitations bloquantes :
 
 ### Solution
 
-**SterPlatform** — un backend Symfony auto-hébergé, générique et multi-projets, qui remplace les fonctionnalités Supabase utilisées :
+**SterPlatform** — un backend Symfony auto-hébergé, générique et multi-projets, qui remplace les fonctionnalités d'infrastructure de Supabase :
 
 | Supabase | SterPlatform |
 |---|---|
-| PostgreSQL | PostgreSQL + Doctrine ORM |
-| Auth JWT + email | LexikJWT + Symfony Security + Mailer |
-| API REST auto-générée | API Platform 3 (OpenAPI) |
-| Row Level Security (RLS) | Symfony Voters + Doctrine Filters |
-| Realtime (WebSockets) | Mercure (SSE pub/sub) |
-| Email templates | Twig + Symfony Mailer |
-| Dashboard admin | EasyAdmin 4 |
+| Auth JWT + email vérification | LexikJWT + Symfony Security + Mailer |
+| Reset password | Symfony Mailer + token Doctrine |
+| Realtime (WebSockets/SSE) | Mercure (SSE pub/sub) |
+| Email templates | Twig + EasyAdmin CRUD + Symfony Mailer |
+| Dashboard admin | EasyAdmin 5 |
+
+> **Ce que SterPlatform ne fait PAS :** il ne porte pas les données métier des applications (tournois, bénévoles, etc.). Chaque application gère son propre schéma via son propre ORM (Prisma pour DartsOpen, JPA pour FestManager). Voir [Architecture_Ecosysteme.md](../../docs/Architecture_Ecosysteme.md).
 
 ### Avantages
 
@@ -96,7 +96,9 @@ Chaque projet est un **tenant** isolé :
 
 ---
 
-## 4. Modèle de données générique
+## 4. Modèle de données
+
+### Entités partagées (socle générique)
 
 ```
 Organization (tenant)
@@ -121,9 +123,18 @@ OrganizationMember
 ├── organization_id → Organization
 ├── role (OWNER | ADMIN | MEMBER)
 └── joined_at
+
+EmailTemplate
+├── id (uuid)
+├── slug (unique — ex. "dartsopen_inscription_confirmation")
+├── project (étiquette — ex. "dartsopen", "festmanager", "global")
+├── subject (ligne objet, peut contenir des variables Twig)
+├── html_body (template Twig complet)
+├── expected_variables (description des variables disponibles)
+└── created_at / updated_at
 ```
 
-Chaque projet (DartsOpen, FestManager…) étend ce socle avec ses propres entités liées à `Organization`.
+> **Règle :** SterPlatform ne contient que ces entités. Les entités métier (tournois, bénévoles, etc.) appartiennent aux applications concernées.
 
 ---
 
@@ -258,72 +269,121 @@ Chaque projet (DartsOpen, FestManager…) étend ce socle avec ses propres entit
 
 ---
 
-### Phase 5 — Migration DartsOpen *(4-5 sessions)*
+### Phase 5 — Email + Gestion des templates *(2-3 sessions)*
 
-**Objectif :** Migrer DartsOpen de Supabase vers SterPlatform.
+**Objectif :** Faire de SterPlatform la plateforme d'envoi d'emails centralisée pour toutes les applications.
 
-#### 5a — Schéma & Entités ✅ *(terminée)*
-- [x] Créer toutes les entités Doctrine miroir du schéma Supabase DartsOpen
-  - `Tournament`, `Round`, `Registration`, `Pool`, `PoolPlayer`, `DartsMatch` (mot-clé PHP), `MatchSet`
-- [x] 8 enums : `GameType`, `EntryType`, `FinishType`, `TournamentStatus`, `MatchStatus`, `RegistrationStatus`, `RegistrationMode`, `ScoringMode`
-- [x] 7 repositories avec JOIN FETCH
-- [x] Migration Doctrine `Version20260515210041` (7 tables + FK + indexes)
-- [x] TenantFilter + DoctrinePublishSubscriber compatibles (`getOrganization()` sur toutes les entités)
-- [x] 45/45 tests passants (aucune régression)
-- [ ] Scripts de migration des données existantes (Supabase → SterPlatform) *(reporté Phase 5e)*
+#### 5a — Infrastructure email
+- [ ] Configurer Brevo comme provider SMTP (`MAILER_DSN=smtp://...@smtp-relay.brevo.com:587`)
+- [ ] Configurer `MAILER_DSN` dans Coolify (staging + prod)
+- [ ] Valider l'envoi depuis les templates existants (verification, reset_password)
 
-#### 5b — Auth frontend
-- [ ] Remplacer `@supabase/ssr` par des appels fetch vers `/api/auth/*`
-- [ ] `lib/api/auth.ts` — client HTTP avec gestion JWT + refresh automatique
-- [ ] Adapter le middleware Next.js (proxy.ts) pour lire le JWT SterPlatform
+#### 5b — Entité EmailTemplate
+- [ ] Entity `EmailTemplate` (slug, project, subject, html_body, expected_variables, timestamps) + migration
+- [ ] EasyAdmin CRUD pour `EmailTemplate` (avec champ texte long pour html_body)
+- [ ] Seeder de templates existants (verification, reset_password) → migration vers EmailTemplate en base
 
-#### 5c — API calls
-- [ ] Remplacer les appels `supabase.from('table').select(...)` par `fetch('/api/resource')`
-- [ ] Client HTTP générique avec intercepteur JWT
-- [ ] Adapter toutes les Server Actions
+#### 5c — Endpoint d'envoi
+- [ ] `POST /api/email/send` — prend `template` (slug), `to`, `variables` (JSON)
+- [ ] Authentification par token applicatif (header `X-App-Token`) — différent du JWT utilisateur
+- [ ] Rendu Twig à la volée depuis le html_body stocké en base
+- [ ] Gestion des erreurs (template introuvable, variables manquantes, SMTP failure)
+- [ ] Tests PHPUnit : send valide, template introuvable, token invalide, variables manquantes
 
-#### 5d — Real-time
-- [ ] Remplacer `supabase.channel(...).on(...)` par `EventSource` Mercure
-- [ ] Adapter `BracketLive`, `MatchBoard`, `ScoreBoard`
-
-#### 5e — Tests & recette
-- [ ] Tests end-to-end du flux complet (inscription → tournoi → phases finales)
-- [ ] Comparaison fonctionnelle avec la version Supabase
-
-**Livrable :** DartsOpen tourne à 100% sur SterPlatform sans Supabase.
+**Livrable :** `POST /api/email/send` opérationnel. Brevo configuré. CRUD templates dans EasyAdmin. 40+ tests passants.
 
 ---
 
-### Phase 6 — Production multi-projets *(1-2 sessions)*
+### Phase 5b-cleanup — Suppression entités métier DartsOpen *(1 session)*
 
-**Objectif :** Documentation et onboarding pour intégrer un nouveau projet.
+**Contexte :** En Phase 5a (Mai 2026), des entités Doctrine miroir du schéma DartsOpen ont été créées dans SterPlatform (`Tournament`, `Round`, `Registration`, `Pool`, `PoolPlayer`, `DartsMatch`, `MatchSet`). Cette décision a été abandonnée — DartsOpen utilise désormais Prisma direct sur sa propre base.
 
-- [ ] Guide "Intégrer un nouveau projet dans SterPlatform"
-- [ ] Variables d'env par projet (`.env.dartsopen`, `.env.festmanager`)
-- [ ] Exemple d'intégration FestManager (Spring Boot → quelle cohabitation ?)
-- [ ] Versioning de l'API (`/api/v1/`)
+**Objectif :** Nettoyer SterPlatform des entités qui ne lui appartiennent pas.
+
+- [ ] Supprimer les entités : `Tournament`, `Round`, `Registration`, `Pool`, `PoolPlayer`, `DartsMatch`, `MatchSet`
+- [ ] Supprimer les 8 enums DartsOpen
+- [ ] Supprimer les 7 repositories associés
+- [ ] Créer une migration Doctrine `DROP TABLE` pour les 7 tables
+- [ ] Vérifier que les 40 tests existants passent toujours (aucune régression)
+
+**Livrable :** SterPlatform ne contient que : User, Organization, OrganizationMember, RefreshToken, EmailTemplate.
+
+---
+
+### Phase 6 — Intégration DartsOpen *(1-2 sessions)*
+
+**Contexte :** DartsOpen utilise déjà SterPlatform pour l'auth JWT (login, register, refresh). Il reste à câbler l'envoi d'emails.
+
+**Objectif :** Brancher DartsOpen sur l'API email SterPlatform.
+
+- [ ] Identifier tous les emails à envoyer depuis DartsOpen (inscription, confirmation paiement, invitation tournoi, résultats ?)
+- [ ] Créer les templates correspondants dans SterPlatform (via EasyAdmin)
+- [ ] Ajouter un token applicatif DartsOpen dans SterPlatform (table `AppToken` ou secret partagé)
+- [ ] Créer `lib/api/sterplatform-email.ts` dans DartsOpen — client vers `POST /api/email/send`
+- [ ] Appeler ce client depuis les Server Actions concernées
+- [ ] Tests
+
+**Livrable :** DartsOpen envoie ses emails via SterPlatform. Aucun SMTP configuré côté DartsOpen.
+
+---
+
+### Phase 7 — Intégration FestManager *(2-3 sessions)*
+
+**Contexte :** FestManager a sa propre auth Spring Boot + JWT (jjwt) et son propre SMTP. Il faut migrer vers SterPlatform.
+
+**Objectif :** FestManager délègue auth et email à SterPlatform.
+
+#### 7a — Migration auth
+- [ ] Remplacer Spring Security + jjwt par des appels HTTP vers `/api/auth/*` de SterPlatform
+- [ ] Adapter le `JwtFilter` Spring Boot pour valider les tokens SterPlatform (clé publique LexikJWT)
+- [ ] Ou : consommer l'API SterPlatform comme proxy (login → appelle SterPlatform, retourne le JWT)
+- [ ] Adapter l'AuthService Angular pour appeler les routes SterPlatform
+- [ ] Gérer le refresh token dans Angular (intercepteur HTTP)
+- [ ] Tests
+
+#### 7b — Migration email
+- [ ] Remplacer `JavaMailSender` + templates Thymeleaf par des appels vers `POST /api/email/send`
+- [ ] Créer les templates FestManager dans SterPlatform (confirmation affectation, invitation, rappel)
+- [ ] Supprimer la config SMTP de FestManager
+- [ ] Tests
+
+**Livrable :** FestManager sans auth propre ni SMTP. Tout passe par SterPlatform.
+
+---
+
+### Phase 8 — Hardening & Documentation *(1 session)*
+
+**Objectif :** Solidifier la plateforme pour un usage multi-projets durable.
+
+- [ ] Rate limiting sur `/api/auth/*` (symfony/rate-limiter)
+- [ ] Monitoring UptimeRobot (health check toutes les 5 min, alerte email si down)
+- [ ] Backup PostgreSQL quotidien (pg_dump → Hetzner Object Storage ou cron local)
+- [ ] Guide "Intégrer un nouveau projet dans SterPlatform" (doc dans `docs/`)
+- [ ] Versioning API `/api/v1/` *(optionnel selon besoin)*
 - [ ] Documentation OpenAPI publique
 
-**Livrable :** Un nouveau projet peut être intégré en moins d'une journée.
+**Livrable :** SterPlatform résiste à la montée en charge, se sauvegarde, et peut accueillir un nouveau projet en moins d'une journée.
 
 ---
 
 ## 6. Ordre de priorité & estimation
 
-| Phase | Durée estimée | Priorité |
-|---|---|---|
-| Phase 0 — Socle | ✅ 2 sessions | ~~🔴 Critique~~ |
-| Phase 1 — Auth | ✅ 1 session | ~~🔴 Critique~~ |
-| Phase 1b — JWT Refresh | ✅ 1 session | ~~🔴 Critique~~ |
-| Phase 2 — Multi-tenancy | ✅ 1 session | ~~🟠 Haute~~ |
-| Phase 3 — Mercure | ✅ 1 session | ~~🟠 Haute~~ |
-| Phase 3b — Refacto + N+1 | ✅ 1 session | ~~🟠 Haute~~ |
-| Phase 4 — Admin + Mise en prod | ✅ 2 sessions | ~~🟡 Moyenne~~ |
-| Phase 5a — Entités DartsOpen | ✅ 1 session | ~~🟡 Moyenne~~ |
-| Phase 5b/c/d/e — Migration frontend | 3-4 sessions | 🟡 Moyenne |
-| Phase 6 — Multi-projets | 1-2 sessions | 🟢 Basse |
+| Phase | Durée estimée | Priorité | Statut |
+|---|---|---|---|
+| Phase 0 — Socle | 2 sessions | ~~🔴 Critique~~ | ✅ |
+| Phase 1 — Auth | 1 session | ~~🔴 Critique~~ | ✅ |
+| Phase 1b — JWT Refresh | 1 session | ~~🔴 Critique~~ | ✅ |
+| Phase 2 — Multi-tenancy | 1 session | ~~🟠 Haute~~ | ✅ |
+| Phase 3 — Mercure | 1 session | ~~🟠 Haute~~ | ✅ |
+| Phase 3b — Refacto + N+1 | 1 session | ~~🟠 Haute~~ | ✅ |
+| Phase 4 — Admin + Mise en prod | 2 sessions | ~~🟡 Moyenne~~ | ✅ |
+| Phase 5 — Email + Templates | 2-3 sessions | 🔴 Critique | ❌ À faire |
+| Phase 5b-cleanup — Suppression entités DartsOpen | 1 session | 🟠 Haute | ❌ À faire |
+| Phase 6 — Intégration DartsOpen (email) | 1-2 sessions | 🟠 Haute | ❌ À faire |
+| Phase 7 — Intégration FestManager (auth + email) | 2-3 sessions | 🟡 Moyenne | ❌ À faire |
+| Phase 8 — Hardening & Documentation | 1 session | 🟢 Basse | ❌ À faire |
 
-**Total estimé : 15-22 sessions**
+**Total restant estimé : 7-10 sessions**
 
 ---
 
@@ -331,11 +391,11 @@ Chaque projet (DartsOpen, FestManager…) étend ce socle avec ses propres entit
 
 | Risque | Mitigation |
 |---|---|
+| SterPlatform down = toutes les apps down | Restart auto Coolify + UptimeRobot + backup DB quotidien |
 | Mercure nécessite un serveur SSE dédié | Inclus dans Docker Compose — pas de coût additionnel |
-| Migration DartsOpen : données existantes | Script de migration SQL + validation avant bascule |
-| FestManager est Spring Boot (pas Symfony) | SterPlatform est une API REST — Spring Boot consomme la même API |
-| PHP vs Java : performances | PHP 8.3 + OPcache + FPM est largement suffisant pour notre charge |
-| Doctrine vs Supabase RLS | Les Voters Symfony sont plus expressifs — pas de régression sécurité |
+| FestManager auth migration : impact Angular | Adapter l'intercepteur HTTP Angular + gérer refresh token |
+| Charge SMTP sur volume d'emails | Brevo 20 000 mails/mois à 9 €/mois — largement suffisant |
+| Token applicatif exposé côté DartsOpen/FestManager | Stocker en variable d'env Coolify, jamais committé |
 
 ---
 
@@ -376,7 +436,8 @@ SterPlatform/
 
 Actions concrètes pour démarrer :
 
-1. Créer les entités Doctrine miroir du schéma Supabase DartsOpen (`Tournament`, `Round`, `Registration`, `Pool`, `Match`…)
-2. Générer les migrations Doctrine
-3. Écrire les scripts de migration des données existantes (Supabase → SterPlatform)
-4. Remplacer `@supabase/ssr` dans DartsOpen par des appels fetch vers `/api/auth/*`
+1. Configurer `MAILER_DSN` Brevo dans Coolify (staging puis prod)
+2. Créer l'entité `EmailTemplate` + migration Doctrine
+3. Ajouter le CRUD EasyAdmin pour `EmailTemplate`
+4. Implémenter `POST /api/email/send` avec rendu Twig dynamique
+5. Écrire les tests PHPUnit pour l'endpoint email

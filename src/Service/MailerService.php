@@ -2,6 +2,7 @@
 
 namespace App\Service;
 
+use App\Entity\EmailTemplate;
 use App\Entity\User;
 use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Mime\Email;
@@ -51,6 +52,20 @@ class MailerService
             ->from($this->fromEmail)
             ->to($user->getEmail())
             ->subject('Réinitialisation de votre mot de passe — SterPlatform')
+            ->html($html);
+
+        $this->mailer->send($email);
+    }
+
+    public function sendFromTemplate(EmailTemplate $template, string $to, array $variables): void
+    {
+        $subject = $this->twig->createTemplate($template->getSubject())->render($variables);
+        $html    = $this->twig->createTemplate($template->getHtmlBody())->render($variables);
+
+        $email = (new Email())
+            ->from($this->fromEmail)
+            ->to($to)
+            ->subject($subject)
             ->html($html);
 
         $this->mailer->send($email);

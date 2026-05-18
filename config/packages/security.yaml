@@ -42,6 +42,11 @@ security:
             refresh_jwt:
                 check_path: /api/auth/refresh
 
+        email_api:
+            pattern: ^/api/email
+            stateless: true
+            security: false
+
         api:
             pattern: ^/api
             stateless: true
