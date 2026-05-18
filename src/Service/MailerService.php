@@ -4,7 +4,6 @@ namespace App\Service;
 
 use App\Entity\EmailTemplate;
 use App\Entity\User;
-use Psr\Log\LoggerInterface;
 use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Mime\Email;
 use Twig\Environment;
@@ -16,7 +15,6 @@ class MailerService
         private readonly Environment $twig,
         private readonly string $appUrl,
         private readonly string $fromEmail,
-        private readonly LoggerInterface $logger,
     ) {}
 
     public function sendVerificationEmail(User $user, ?string $redirectUri = null): void
@@ -61,12 +59,6 @@ class MailerService
 
     public function sendFromTemplate(EmailTemplate $template, string $to, array $variables): void
     {
-        $this->logger->critical('sendFromTemplate: start', [
-            'slug' => $template->getSlug(),
-            'to'   => $to,
-            'from' => $this->fromEmail,
-        ]);
-
         $loader = new \Twig\Loader\ArrayLoader([
             'subject'  => $template->getSubject(),
             'htmlBody' => $template->getHtmlBody(),
@@ -76,26 +68,12 @@ class MailerService
         $subject = $twig->render('subject', $variables);
         $html    = $twig->render('htmlBody', $variables);
 
-        $this->logger->critical('sendFromTemplate: twig rendered', [
-            'subject' => $subject,
-            'html_length' => strlen($html),
-        ]);
-
         $email = (new Email())
             ->from($this->fromEmail)
             ->to($to)
             ->subject($subject)
             ->html($html);
 
-        try {
-            $this->mailer->send($email);
-            $this->logger->critical('sendFromTemplate: mailer->send() completed OK');
-        } catch (\Throwable $e) {
-            $this->logger->critical('sendFromTemplate: mailer->send() EXCEPTION', [
-                'class'   => $e::class,
-                'message' => $e->getMessage(),
-            ]);
-            throw $e;
-        }
+        $this->mailer->send($email);
     }
 }
